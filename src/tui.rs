@@ -108,7 +108,9 @@ impl<'a> App<'a> {
                 // Nice section title header.
                 MainPageRow::Section(name) => Line::from(Span::styled(
                     format!("────┤ {name} ├────"),
-                    Style::default().add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .add_modifier(Modifier::BOLD)
+                        .fg(Color::Magenta),
                 )),
 
                 // Empty row.
