@@ -1,25 +1,9 @@
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, List, ListItem, ListState},
 };
 use crossterm::event::{self, Event, KeyCode};
 use crate::config::FeedConfig;
-
-
-/// Rows in the main TUI page.
-enum MainPageRow<'a> {
-    /// Section title.
-    Section(&'a str),
-
-    /// Spacer between sections.
-    Spacer,
-
-    /// Feed in a section.
-    Feed {
-        /// Name of the feed.
-        name: &'a str,
-    },
-}
 
 /// Pages in the TUI.
 enum Page {
@@ -36,7 +20,10 @@ enum Page {
 /// TUI application state.
 pub struct App<'a> {
     /// Rows in the main page built from the feed config.
-    rows: Vec<MainPageRow<'a>>,
+    rows: Vec<ListItem<'a>>,
+
+    /// List state over `rows`
+    list_state: ListState,
 
     /// Indices of feeds in `rows`.
     feed_row_indices: Vec<usize>,
@@ -53,30 +40,41 @@ impl<'a> App<'a> {
     pub fn new(config: &'a FeedConfig) -> Self {
         // The terminal lines that will be shown on the TUI.
         let mut rows = Vec::new();
+        let mut feed_row_indices = Vec::new();
 
         // Go through each section.
         for section in &config.sections {
             // The first line of the section is the section title.
-            rows.push(MainPageRow::Section(&section.name));
+            rows.push(ListItem::new(Line::styled(
+                format!("────┤ {} ├────", section.name),
+                Style::default()
+                    .add_modifier(Modifier::BOLD)
+                    .fg(Color::Magenta),
+            )));
 
             // Push the feeds into the section.
             for feed in &section.feeds {
-                rows.push(MainPageRow::Feed { name: &feed.name });
+                // Save the index to this feed.
+                feed_row_indices.push(rows.len());
+
+                // Save this feed.
+                rows.push(ListItem::new(Line::from(vec![
+                    Span::raw("      "),
+                    Span::raw(feed.name.clone()),
+                ])));
             }
 
             // Separate the section from other sections.
-            rows.push(MainPageRow::Spacer);
+            rows.push(ListItem::new(""));
         }
 
-        // Get the feed row indices.
-        let feed_row_indices = rows.iter().enumerate()
-            .filter_map(|(i, row)|
-                matches!(row, MainPageRow::Feed { .. }).then_some(i))
-            .collect();
+        let mut list_state = ListState::default();
+        list_state.select(feed_row_indices.get(0).copied());
 
         Self {
             rows,
             feed_row_indices,
+            list_state,
             selected_feed: 0,
             page: Page::Main,
         }
@@ -84,16 +82,18 @@ impl<'a> App<'a> {
 
     /// Runs the application loop until exit.
     pub fn run<B: Backend>(mut self, terminal: &mut Terminal<B>) {
+        // If we don't get input, the viewport doesn't change.
+        // If we do, it's dirty and we should redraw it.
+        let mut dirty = true;
+
         loop {
             // Draw the page.
-            terminal.draw(|f| match self.page {
-                Page::Main => self.draw_main(f),
-                Page::Feed => Self::draw_feed(f),
-                _ => unreachable!(),
-            }).unwrap();
+            if dirty {
+                terminal.draw(|f| self.draw(f)).unwrap();
+            }
 
             // Handle input.
-            if self.handle_input() {
+            if self.handle_input(&mut dirty) {
                 break;
             }
         }
@@ -104,113 +104,98 @@ impl<'a> App<'a> {
         self.feed_row_indices[self.selected_feed]
     }
 
+    /// Draw the TUI.
+    fn draw(&mut self, f: &mut Frame) {
+        match self.page {
+            Page::Main => self.draw_main(f),
+            Page::Feed => self.draw_feed(f),
+            Page::Post => unreachable!(),
+        }
+    }
+
     /// Draw the main feeds listings page.
-    fn draw_main(&self, f: &mut Frame) {
-        let area = f.area();
-        let viewport_height = area.height.saturating_sub(2) as usize;
-        let bottom_margin = 4;
-        let cursor_row = self.selected_feed_idx();
-        let scroll_y = cursor_row
-            .saturating_sub(viewport_height.saturating_sub(bottom_margin));
+    fn draw_main(&mut self, f: &mut Frame) {
+        // Map the selection to the actual row index.
+        self.list_state.select(Some(self.selected_feed_idx()));
 
-        // Generate the rows.
-        let text: Vec<Line> = self.rows.iter().enumerate()
-            .map(|(i, row)| match row {
-                // Nice section title header.
-                MainPageRow::Section(name) => Line::from(Span::styled(
-                    format!("────┤ {name} ├────"),
-                    Style::default()
-                        .add_modifier(Modifier::BOLD)
-                        .fg(Color::Magenta),
-                )),
+        let list = List::new(self.rows.clone())
+            .block(Block::default().borders(Borders::ALL).title("Feeds"))
+            .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
+            .highlight_symbol("")
+            .scroll_padding(4);
 
-                // Empty row.
-                MainPageRow::Spacer => Line::from(""),
-
-                // Feed with an indented title.
-                MainPageRow::Feed { name, .. } => {
-                    // Selected rows have reversed colors.
-                    let style = if i == self.selected_feed_idx() {
-                        Style::default().add_modifier(Modifier::REVERSED)
-                    } else {
-                        Style::default()
-                    };
-
-                    Line::from(vec![
-                        Span::raw("      "),
-                        Span::styled(*name, style),
-                    ])
-                }
-            })
-            .collect();
-
-        // Using the rows, generate the page block.
-        let widget = Paragraph::new(text)
-            .scroll((scroll_y as u16, 0))
-            .block(Block::default().borders(Borders::ALL).title("Feeds"));
-
-        // Render the page.
-        f.render_widget(widget, f.area());
+        f.render_stateful_widget(list, f.area(), &mut self.list_state);
     }
 
     /// Draw the post listings for a feed page.
-    fn draw_feed(f: &mut Frame) {
+    fn draw_feed(&self, f: &mut Frame) {
         // Empty for now
-        let widget = Paragraph::new("Detail page")
-            .block(Block::default().borders(Borders::ALL).title("Detail"));
-
+        let widget = Block::default().borders(Borders::ALL).title("Detail");
         f.render_widget(widget, f.area());
     }
 
     /// Handle the input for the app.
-    fn handle_input(&mut self) -> bool {
-        if let Event::Key(key) = event::read().unwrap() {
-            match self.page {
-                Page::Main => match key.code {
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        self.selected_feed = self.selected_feed
-                            .saturating_sub(1);
-                    }
+    ///
+    /// If we get input, `dirty` is set to true.
+    fn handle_input(&mut self, dirty: &mut bool) -> bool {
+        let Event::Key(key) = event::read().unwrap() else {
+            return false;
+        };
 
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        let max = self.feed_row_indices.len() - 1;
-                        self.selected_feed = max.min(self.selected_feed + 1);
-                    }
+        // We got input, set the dirty bool.
+        *dirty = true;
 
-                    KeyCode::Enter | KeyCode::Char('l') => {
-                        self.page = Page::Feed;
-                    }
+        match self.page {
+            Page::Main => match key.code {
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.selected_feed = self.selected_feed
+                        .saturating_sub(1);
+                }
 
-                    KeyCode::Esc | KeyCode::Char('q') => {
-                        return true;
-                    }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    let max = self.feed_row_indices.len() - 1;
+                    self.selected_feed = max.min(self.selected_feed + 1);
+                }
 
-                    KeyCode::PageUp | KeyCode::Char('K') => {
-                        self.selected_feed = self.selected_feed
-                            .saturating_sub(10);
-                    },
+                KeyCode::Enter | KeyCode::Char('l') => {
+                    self.page = Page::Feed;
+                }
 
-                    KeyCode::PageDown | KeyCode::Char('J') => {
-                        let max = self.feed_row_indices.len() - 1;
-                        self.selected_feed = max.min(self.selected_feed + 10);
-                    }
+                KeyCode::Esc | KeyCode::Char('q') => {
+                    return true;
+                }
 
-                    _ => {}
+                KeyCode::PageUp | KeyCode::Char('K') => {
+                    self.selected_feed = self.selected_feed
+                        .saturating_sub(10);
                 },
 
-                Page::Feed => match key.code {
-                    KeyCode::Esc | KeyCode::Char('h') => {
-                        self.page = Page::Main;
-                    }
+                KeyCode::PageDown | KeyCode::Char('J') => {
+                    let max = self.feed_row_indices.len() - 1;
+                    self.selected_feed = max.min(self.selected_feed + 10);
+                }
 
-                    KeyCode::Char('q') => {
-                        return true;
-                    }
+                _ => {
+                    // Unhandled input doesn't dirty the viewport.
+                    *dirty = false;
+                }
+            },
 
-                    _ => {}
-                },
-                _ => unreachable!(),
-            }
+            Page::Feed => match key.code {
+                KeyCode::Esc | KeyCode::Char('h') => {
+                    self.page = Page::Main;
+                }
+
+                KeyCode::Char('q') => {
+                    return true;
+                }
+
+                _ => {
+                    // Unhandled input doesn't dirty the viewport.
+                    *dirty = false;
+                }
+            },
+            _ => unreachable!(),
         }
 
         false
