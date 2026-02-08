@@ -38,6 +38,9 @@ pub struct App<'a> {
     /// Rows in the main page built from the feed config.
     rows: Vec<MainPageRow<'a>>,
 
+    /// Indices of feeds in `rows`.
+    feed_row_indices: Vec<usize>,
+
     /// Index of the currently selected feed.
     selected_feed: usize,
 
@@ -65,8 +68,15 @@ impl<'a> App<'a> {
             rows.push(MainPageRow::Spacer);
         }
 
+        // Get the feed row indices.
+        let feed_row_indices = rows.iter().enumerate()
+            .filter_map(|(i, row)|
+                matches!(row, MainPageRow::Feed { .. }).then_some(i))
+            .collect();
+
         Self {
             rows,
+            feed_row_indices,
             selected_feed: 0,
             page: Page::Main,
         }
@@ -89,19 +99,9 @@ impl<'a> App<'a> {
         }
     }
 
-    /// Get the [`MainPageRow`] indices into `self.rows` that are feeds.
-    fn feed_row_indices(&self) -> Vec<usize> {
-        self.rows
-            .iter()
-            .enumerate()
-            .filter_map(|(i, row)|
-                matches!(row, MainPageRow::Feed { .. }).then_some(i))
-            .collect()
-    }
-
     /// Get the index of the currently selected feed.
     fn selected_feed_idx(&self) -> usize {
-        self.feed_row_indices()[self.selected_feed]
+        self.feed_row_indices[self.selected_feed]
     }
 
     /// Draw the main feeds listings page.
@@ -173,7 +173,7 @@ impl<'a> App<'a> {
                     }
 
                     KeyCode::Down | KeyCode::Char('j') => {
-                        let max = self.feed_row_indices().len() - 1;
+                        let max = self.feed_row_indices.len() - 1;
                         self.selected_feed = max.min(self.selected_feed + 1);
                     }
 
@@ -191,15 +191,22 @@ impl<'a> App<'a> {
                     },
 
                     KeyCode::PageDown | KeyCode::Char('J') => {
-                        let max = self.feed_row_indices().len() - 1;
+                        let max = self.feed_row_indices.len() - 1;
                         self.selected_feed = max.min(self.selected_feed + 10);
                     }
 
                     _ => {}
                 },
+
                 Page::Feed => match key.code {
-                    KeyCode::Esc | KeyCode::Char('h') => self.page = Page::Main,
-                    KeyCode::Char('q') => return true,
+                    KeyCode::Esc | KeyCode::Char('h') => {
+                        self.page = Page::Main;
+                    }
+
+                    KeyCode::Char('q') => {
+                        return true;
+                    }
+
                     _ => {}
                 },
                 _ => unreachable!(),
