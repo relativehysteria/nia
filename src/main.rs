@@ -23,7 +23,7 @@ fn main() -> io::Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     // Run the app!
-    nia::tui::App::new(&feeds).run(&mut terminal);
+    nia::tui::App::new(feeds).run(&mut terminal);
 
     // Restore the terminal.
     disable_raw_mode()?;
