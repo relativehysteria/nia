@@ -93,6 +93,21 @@ impl Page for MainPage {
 
     fn on_key(&mut self, key: KeyCode) -> PageAction {
         match key {
+            // Because the main page is the first page shown, the 'h' key will
+            // be passed through to us instead of being handled in the app input
+            // handler to pop the page.
+
+            // Download the currently selected feed.
+            KeyCode::Char('h') => {
+                PageAction::None
+            }
+
+            // Download all feeds.
+            KeyCode::Char('H') => {
+                PageAction::None
+            }
+
+            // Check the posts listing for the selected feed.
             KeyCode::Enter | KeyCode::Char('l') => {
                 if let Some(MainRow::Feed(name)) = self.list.selected_item() {
                     PageAction::Push(Box::new(FeedPage::new(name.clone())))
@@ -100,6 +115,7 @@ impl Page for MainPage {
                     PageAction::None
                 }
             }
+
             _ => PageAction::None,
         }
     }

@@ -2,8 +2,7 @@ use ratatui::{
     prelude::*,
     widgets::{Block, Borders, List, ListItem},
 };
-use crossterm::event::KeyCode;
-use crate::tui::{PageAction, Page, NavigableList, ListPage};
+use crate::tui::{Page, NavigableList, ListPage};
 
 pub struct PostPage {
     list: ListPage<String>,
@@ -33,11 +32,5 @@ impl Page for PostPage {
 
     fn list(&mut self) -> &mut dyn NavigableList {
         &mut self.list
-    }
-
-    fn on_key(&mut self, key: KeyCode) -> PageAction {
-        match key {
-            _ => PageAction::None,
-        }
     }
 }

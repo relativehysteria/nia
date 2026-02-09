@@ -39,6 +39,7 @@ impl Page for FeedPage {
 
     fn on_key(&mut self, key: KeyCode) -> PageAction {
         match key {
+            // Check the post page of the selected post.
             KeyCode::Enter | KeyCode::Char('l') =>
                 PageAction::Push(Box::new(PostPage::new())),
             _ => PageAction::None,
