@@ -28,10 +28,6 @@ pub trait Page {
     fn on_key(&mut self, key: KeyCode) -> PageAction {
         PageAction::None
     }
-
-    /// Handle a frame tick.
-    #[allow(unused_variables)]
-    fn tick(&mut self, now: Instant) {}
 }
 
 /// Navigation controls for selectable lists.

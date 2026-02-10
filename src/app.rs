@@ -1,8 +1,9 @@
 use std::time::{Instant, Duration};
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::prelude::*;
-use crate::tui::{main, Page, PageAction};
+use crate::tui::{main, Page, PageAction, Spinner};
 use crate::config::{Feed, FeedId, FeedConfig};
+use crate::download::DownloadState;
 
 /// State of the feeds.
 pub struct FeedState {
@@ -11,12 +12,19 @@ pub struct FeedState {
 
     /// Number of currently active downloads.
     pub active_downloads: usize,
+
+    /// A global spinner that can be used to draw a spin animation.
+    pub spinner: Spinner,
 }
 
 impl FeedState {
     /// Create a new feed state.
     pub fn new(feed_config: FeedConfig) -> Self {
-        Self { feed_config, active_downloads: 0 }
+        Self {
+            feed_config,
+            active_downloads: 0,
+            spinner: Spinner::new(),
+        }
     }
 
     /// Get a reference to a feed.
@@ -34,6 +42,9 @@ pub struct App {
 
     /// Application state.
     feed_state: FeedState,
+
+    /// State of the background feed downloader.
+    download_state: DownloadState,
 }
 
 impl App {
@@ -42,6 +53,7 @@ impl App {
         Self {
             pages: vec![Box::new(main::MainPage::new(&feeds))],
             feed_state: FeedState::new(feeds),
+            download_state: DownloadState::spawn_downloader_thread(),
         }
     }
 
@@ -71,10 +83,10 @@ impl App {
                     }
                 }
 
-                // Call the tick handler for the page if it's the right time.
+                // Animate the spinner.
                 if last_tick.elapsed() >= tick_rate {
                     let now = Instant::now();
-                    self.tick(now);
+                    self.feed_state.spinner.tick(now);
                     last_tick = now;
                 }
             } else {
@@ -84,11 +96,6 @@ impl App {
                 }
             }
         }
-    }
-
-    /// Call the tick handler for the currently shown page.
-    fn tick(&mut self, now: Instant) {
-        self.pages.last_mut().unwrap().tick(now)
     }
 
     /// Go back from the currently shown page to the one before.
