@@ -8,16 +8,21 @@ use crate::app::FeedState;
 
 /// The feed page that lists out all the posts.
 pub struct FeedPage {
+    /// The title of this feed.
+    title: String,
+
     /// List of rows on the feed page.
+    ///
+    /// In this case, each row is the title of a post.
     list: ListPage<String>,
 }
 
 impl FeedPage {
-    pub fn new(_feed_name: String) -> Self {
+    pub fn new(title: String) -> Self {
         // Fake data for now
-        let rows = vec!["test 1".to_string(), "test 2".to_string()];
+        let rows = vec![];
 
-        Self { list: ListPage::new(rows), }
+        Self { title, list: ListPage::new(rows), }
     }
 }
 
@@ -28,8 +33,10 @@ impl Page for FeedPage {
             ListItem::new(title.as_str())
         });
 
+        let title = self.title.as_str();
+
         let list = List::new(items)
-            .block(Block::default().borders(Borders::ALL).title("Posts"))
+            .block(Block::default().borders(Borders::ALL).title(title))
             .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
         f.render_stateful_widget(list, f.area(), &mut self.list.state);
@@ -39,11 +46,17 @@ impl Page for FeedPage {
         &mut self.list
     }
 
-    fn on_key(&mut self, key: KeyCode) -> PageAction {
+    fn on_key(&mut self, key: KeyCode, state: &FeedState) -> PageAction {
         match key {
             // Check the post page of the selected post.
-            KeyCode::Enter | KeyCode::Char('l') =>
-                PageAction::NewPage(Box::new(PostPage::new())),
+            KeyCode::Enter | KeyCode::Char('l') => {
+                if let Some(selected) = self.list.selected_item() {
+                    let title = selected.clone();
+                    PageAction::NewPage(Box::new(PostPage::new(title)))
+                } else {
+                    PageAction::None
+                }
+            }
             _ => PageAction::None,
         }
     }

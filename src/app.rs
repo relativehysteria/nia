@@ -207,7 +207,7 @@ impl App {
 
         // We haven't handled the input above. The page might wanna handle it
         // instead.
-        match page.on_key(key.code) {
+        match page.on_key(key.code, &self.feed_state) {
             PageAction::None => {},
             PageAction::NewPage(p) => self.pages.push(p),
             PageAction::DownloadFeed(feed_id) => {

@@ -99,7 +99,7 @@ impl Page for MainPage {
         &mut self.list
     }
 
-    fn on_key(&mut self, key: KeyCode) -> PageAction {
+    fn on_key(&mut self, key: KeyCode, state: &FeedState) -> PageAction {
         let Some(selected) = self.list.selected_item() else {
             return PageAction::None;
         };
@@ -125,9 +125,9 @@ impl Page for MainPage {
 
             // Check the posts listing for the selected feed.
             KeyCode::Enter | KeyCode::Char('l') => {
-                if let MainRow::Feed { .. } = selected {
-                    PageAction::NewPage(
-                        Box::new(FeedPage::new("test".to_string())))
+                if let MainRow::Feed(feed_id) = selected {
+                    let title = state.get_feed(feed_id).unwrap().name.clone();
+                    PageAction::NewPage(Box::new(FeedPage::new(title)))
                 } else {
                     PageAction::None
                 }

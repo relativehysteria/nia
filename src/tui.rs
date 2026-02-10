@@ -20,14 +20,14 @@ pub trait Page {
     /// Draw this page in the TUI.
     fn draw(&mut self, f: &mut Frame, state: &FeedState);
 
-    /// Access to the list for shared navigation.
-    fn list(&mut self) -> &mut dyn NavigableList;
-
     /// Called after list navigation keys are handled.
     #[allow(unused_variables)]
-    fn on_key(&mut self, key: KeyCode) -> PageAction {
+    fn on_key(&mut self, key: KeyCode, state: &FeedState) -> PageAction {
         PageAction::None
     }
+
+    /// Access to the list for shared navigation.
+    fn list(&mut self) -> &mut dyn NavigableList;
 }
 
 /// Navigation controls for selectable lists.
