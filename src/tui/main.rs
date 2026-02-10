@@ -126,8 +126,15 @@ impl Page for MainPage {
             // Check the posts listing for the selected feed.
             KeyCode::Enter | KeyCode::Char('l') => {
                 if let MainRow::Feed(feed_id) = selected {
-                    let title = state.get_feed(feed_id).unwrap().name.clone();
-                    PageAction::NewPage(Box::new(FeedPage::new(title)))
+                    // Don't do anything if the feed is empty.
+                    let feed = state.get_feed(feed_id).unwrap();
+                    if feed.posts.len() == 0 {
+                        PageAction::None
+                    } else {
+                        let title = feed.name.clone();
+                        PageAction::NewPage(Box::new(FeedPage::new(title)))
+                    }
+
                 } else {
                     PageAction::None
                 }
