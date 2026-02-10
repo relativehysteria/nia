@@ -33,8 +33,19 @@ pub struct Feed {
     pub posts: Vec<Post>,
 }
 
+/// A single post in a feed.
 #[derive(Debug, Clone)]
 pub struct Post;
+
+/// Feed index information.
+#[derive(Debug, Clone)]
+pub struct FeedId {
+    /// Index into `FeedConfig.sections`.
+    pub section_idx: usize,
+
+    /// Index into `Section.feeds`.
+    pub feed_idx: usize,
+}
 
 impl FeedConfig {
     /// Parse a config from any buffered reader.

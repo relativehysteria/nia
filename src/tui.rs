@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use ratatui::{prelude::*, widgets::ListState};
 use crossterm::event::KeyCode;
 use crate::app::FeedState;
+use crate::config::FeedId;
 
 /// Trait which must be implemented for all entries in a navigable list that are
 /// selectable.
@@ -31,12 +32,6 @@ pub trait Page {
     /// Handle a frame tick.
     #[allow(unused_variables)]
     fn tick(&mut self, now: Instant) {}
-
-    /// Return whether this page asks the application to run ticks instead of
-    /// blocking on input.
-    fn should_tick(&self) -> bool {
-        false
-    }
 }
 
 /// Navigation controls for selectable lists.
@@ -64,10 +59,7 @@ pub enum PageAction {
     NewPage(Box<dyn Page>),
 
     /// Download a feed.
-    DownloadFeed {
-        section_idx: usize,
-        feed_idx: usize,
-    },
+    DownloadFeed(FeedId),
 
     /// Download all feeds.
     DownloadAllFeeds,

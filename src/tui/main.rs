@@ -5,16 +5,13 @@ use ratatui::{
 use crossterm::event::KeyCode;
 use crate::tui::{
     PageAction, Page, NavigableList, ListPage, feed::FeedPage, Selectable};
-use crate::config::FeedConfig;
+use crate::config::{FeedConfig, FeedId};
 use crate::app::FeedState;
 
 /// Rows in the main page.
 enum MainRow {
     SectionHeader(String),
-    Feed {
-        section_idx: usize,
-        feed_idx: usize,
-    },
+    Feed(FeedId),
     Spacer,
 }
 
@@ -43,7 +40,7 @@ impl MainPage {
 
             // Push the feeds into the section.
             for (feed_idx, _feed) in section.feeds.iter().enumerate() {
-                rows.push(MainRow::Feed { section_idx, feed_idx });
+                rows.push(MainRow::Feed(FeedId { section_idx, feed_idx }));
             }
 
             // Separate the section from other secitons.
@@ -69,8 +66,8 @@ impl Page for MainPage {
                 ))
             }
 
-            MainRow::Feed { section_idx, feed_idx } => {
-                let feed = state.get_feed(*section_idx, *feed_idx).unwrap();
+            MainRow::Feed(feed_id) => {
+                let feed = state.get_feed(feed_id.clone()).unwrap();
                 ListItem::new(Line::from(vec![
                     Span::raw("      "),
                     Span::raw(feed.name.clone()),
@@ -107,11 +104,8 @@ impl Page for MainPage {
 
             // Download the currently selected feed.
             KeyCode::Char('h') => {
-                if let MainRow::Feed { section_idx, feed_idx } = selected {
-                    PageAction::DownloadFeed {
-                        section_idx: *section_idx,
-                        feed_idx: *feed_idx
-                    }
+                if let MainRow::Feed(feed_id) = selected {
+                    PageAction::DownloadFeed(feed_id.clone())
                 } else {
                     PageAction::None
                 }

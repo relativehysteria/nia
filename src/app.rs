@@ -2,7 +2,7 @@ use std::time::{Instant, Duration};
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::prelude::*;
 use crate::tui::{main, Page, PageAction};
-use crate::config::{Feed, FeedConfig};
+use crate::config::{Feed, FeedId, FeedConfig};
 
 /// State of the feeds.
 pub struct FeedState {
@@ -20,11 +20,9 @@ impl FeedState {
     }
 
     /// Get a reference to a feed.
-    pub fn get_feed(&self, section_idx: usize, feed_idx: usize)
-        -> Option<&Feed>
-    {
-        self.feed_config.sections.get(section_idx)
-            .map(|section| section.feeds.get(feed_idx))
+    pub fn get_feed(&self, feed_id: FeedId) -> Option<&Feed> {
+        self.feed_config.sections.get(feed_id.section_idx)
+            .map(|section| section.feeds.get(feed_id.feed_idx))
             .flatten()
     }
 }
@@ -58,8 +56,9 @@ impl App {
             // Draw the page.
             terminal.draw(|f| self.draw(f)).unwrap();
 
-            // If there's an active animation, we have to do ticks.
-            if self.should_tick() {
+            // If there's an active download, we have to do ticks because of
+            // animations and polls and stuff.
+            if self.feed_state.active_downloads > 0 {
                 // Our input handler _blocks_, so we will poll for events on a
                 // timeout and only call the handler when we get an event.
                 let timeout = tick_rate
@@ -85,12 +84,6 @@ impl App {
                 }
             }
         }
-    }
-
-    /// Ask the current page whether we should tick instead of blocking on
-    /// input.
-    fn should_tick(&self) -> bool {
-        self.pages.last().unwrap().should_tick()
     }
 
     /// Call the tick handler for the currently shown page.
@@ -150,8 +143,11 @@ impl App {
         match page.on_key(key.code) {
             PageAction::None => {},
             PageAction::NewPage(p) => self.pages.push(p),
-            PageAction::DownloadFeed { section_idx, feed_idx } => {},
-            PageAction::DownloadAllFeeds => {},
+            PageAction::DownloadFeed(feed_id) => {
+                self.feed_state.active_downloads += 1;
+            },
+            PageAction::DownloadAllFeeds => {
+            },
         }
 
         false
