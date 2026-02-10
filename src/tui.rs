@@ -4,9 +4,8 @@ pub mod post;
 
 use std::time::{Duration, Instant};
 use ratatui::{prelude::*, widgets::ListState};
-use crossterm::event::{self, Event, KeyCode};
-use crate::config::FeedConfig;
-
+use crossterm::event::KeyCode;
+use crate::app::FeedState;
 
 /// Trait which must be implemented for all entries in a navigable list that are
 /// selectable.
@@ -18,7 +17,7 @@ pub trait Selectable {
 /// Implementation of a single page in the TUI.
 pub trait Page {
     /// Draw this page in the TUI.
-    fn draw(&mut self, f: &mut Frame);
+    fn draw(&mut self, f: &mut Frame, state: &FeedState);
 
     /// Access to the list for shared navigation.
     fn list(&mut self) -> &mut dyn NavigableList;
@@ -33,9 +32,9 @@ pub trait Page {
     #[allow(unused_variables)]
     fn tick(&mut self, now: Instant) {}
 
-    /// Return whether this page has an active animation and the `tick()`
-    /// handler should be called.
-    fn has_active_animation(&self) -> bool {
+    /// Return whether this page asks the application to run ticks instead of
+    /// blocking on input.
+    fn should_tick(&self) -> bool {
         false
     }
 }
@@ -58,8 +57,20 @@ impl Selectable for String {
 
 /// Page actions that might be returned from the page specific input handler.
 pub enum PageAction {
+    /// No action.
     None,
-    Push(Box<dyn Page>),
+
+    /// Go to a new page.
+    NewPage(Box<dyn Page>),
+
+    /// Download a feed.
+    DownloadFeed {
+        section_idx: usize,
+        feed_idx: usize,
+    },
+
+    /// Download all feeds.
+    DownloadAllFeeds,
 }
 
 /// A page that lists out selectable `T` elements.
@@ -73,7 +84,7 @@ pub struct ListPage<T> {
     /// Index into `selectable`.
     selected: usize,
 
-    /// The state of the list.
+    /// The state of the ratatui list.
     state: ListState,
 }
 
@@ -159,138 +170,5 @@ impl Spinner {
     pub fn reset(&mut self) {
         self.frame_idx = 0;
         self.last_tick = Instant::now();
-    }
-}
-
-/// The TUI application state.
-pub struct App {
-    /// The page stack.
-    pages: Vec<Box<dyn Page>>,
-}
-
-impl App {
-    /// Create a new application state given the `config`.
-    pub fn new(config: FeedConfig) -> Self {
-        Self {
-            pages: vec![Box::new(main::MainPage::new(config))],
-        }
-    }
-
-    /// Run the application.
-    pub fn run<B: Backend>(mut self, terminal: &mut Terminal<B>) {
-        // Set the tick rate for animations.
-        let fps = 60;
-        let tick_rate = Duration::from_millis(1000 / fps);
-        let mut last_tick = Instant::now();
-
-        loop {
-            // Draw the page.
-            terminal.draw(|f| self.draw(f)).unwrap();
-
-            // If there's an active animation, we have to do ticks.
-            if self.has_active_animation() {
-                // Our input handler _blocks_, so we will poll for events on a
-                // timeout and only call the handler when we get an event.
-                let timeout = tick_rate
-                    .checked_sub(last_tick.elapsed())
-                    .unwrap_or(Duration::ZERO);
-
-                if event::poll(timeout).unwrap() {
-                    if self.handle_input() {
-                        break;
-                    }
-                }
-
-                // Call the tick handler for the page if it's the right time.
-                if last_tick.elapsed() >= tick_rate {
-                    let now = Instant::now();
-                    self.tick(now);
-                    last_tick = now;
-                }
-            } else {
-                // No active animation. We can block on input
-                if self.handle_input() {
-                    break;
-                }
-            }
-        }
-    }
-
-    /// Ask the current page whether it has an active animation and should be
-    /// ticked.
-    fn has_active_animation(&self) -> bool {
-        self.current_page_ref().has_active_animation()
-    }
-
-    /// Call the tick handler for the currently shown page.
-    fn tick(&mut self, now: Instant) {
-        self.current_page().tick(now)
-    }
-
-    /// Get the currently shown page.
-    fn current_page(&mut self) -> &mut Box<dyn Page> {
-        self.pages.last_mut().unwrap()
-    }
-
-    /// Get a reference to the currently shown page.
-    fn current_page_ref(&self) -> &Box<dyn Page> {
-        self.pages.last().unwrap()
-    }
-
-    /// Go back from the currently shown page to the one before.
-    fn go_back(&mut self) {
-        if self.pages.len() > 1 {
-            self.pages.pop();
-        }
-    }
-
-    /// Draw the page.
-    fn draw(&mut self, f: &mut Frame) {
-        self.current_page().draw(f)
-    }
-
-    /// Handle the input for the app in a blocking manner.
-    fn handle_input(&mut self) -> bool {
-        // Get the key.
-        let Event::Key(key) = event::read().unwrap() else {
-            return false;
-        };
-
-        // Global escape: pop page if possible. If we're on the first page, we
-        // allow this event to reach it, otherwise we use it to pop the current
-        // page.
-        if self.pages.len() > 1 {
-            if matches!(key.code, KeyCode::Esc | KeyCode::Char('h')) {
-                self.go_back();
-                return false;
-            }
-        }
-
-        // Shared list navigation hook for all pages. If we handle the input
-        // here, it won't be passed to the page specific handler.
-        let page = self.current_page();
-        let mut input_handled = true;
-        match key.code {
-            KeyCode::Up | KeyCode::Char('k') => page.list().up(1),
-            KeyCode::Down | KeyCode::Char('j') => page.list().down(1),
-            KeyCode::PageUp | KeyCode::Char('K') => page.list().up(10),
-            KeyCode::PageDown | KeyCode::Char('J') => page.list().down(10),
-            KeyCode::Char('q') => return true,
-            _ => input_handled = false,
-        }
-
-        // If we have handled the input above, there's nothing else to do.
-        if input_handled {
-            return false;
-        }
-
-        // We haven't handled the input above. The page might wanna handle it
-        // instead.
-        match page.on_key(key.code) {
-            PageAction::None => {},
-            PageAction::Push(p) => self.pages.push(p),
-        }
-
-        false
     }
 }

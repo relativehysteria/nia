@@ -3,6 +3,7 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem},
 };
 use crate::tui::{Page, NavigableList, ListPage};
+use crate::app::FeedState;
 
 pub struct PostPage {
     list: ListPage<String>,
@@ -18,7 +19,7 @@ impl PostPage {
 }
 
 impl Page for PostPage {
-    fn draw(&mut self, f: &mut Frame) {
+    fn draw(&mut self, f: &mut Frame, _state: &FeedState) {
         let items = self.list.items.iter().map(|title| {
             ListItem::new(title.as_str())
         });

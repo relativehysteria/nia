@@ -4,14 +4,16 @@ use ratatui::{
 };
 use crossterm::event::KeyCode;
 use crate::tui::{PageAction, Page, NavigableList, ListPage, post::PostPage};
+use crate::app::FeedState;
 
 /// The feed page that lists out all the posts.
 pub struct FeedPage {
+    /// List of rows on the feed page.
     list: ListPage<String>,
 }
 
 impl FeedPage {
-    pub fn new(feed_name: String) -> Self {
+    pub fn new(_feed_name: String) -> Self {
         // Fake data for now
         let rows = vec!["test 1".to_string(), "test 2".to_string()];
 
@@ -21,7 +23,7 @@ impl FeedPage {
 
 
 impl Page for FeedPage {
-    fn draw(&mut self, f: &mut Frame) {
+    fn draw(&mut self, f: &mut Frame, _state: &FeedState) {
         let items = self.list.items.iter().map(|title| {
             ListItem::new(title.as_str())
         });
@@ -41,7 +43,7 @@ impl Page for FeedPage {
         match key {
             // Check the post page of the selected post.
             KeyCode::Enter | KeyCode::Char('l') =>
-                PageAction::Push(Box::new(PostPage::new())),
+                PageAction::NewPage(Box::new(PostPage::new())),
             _ => PageAction::None,
         }
     }

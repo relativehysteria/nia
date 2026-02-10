@@ -6,12 +6,15 @@ use crossterm::event::KeyCode;
 use crate::tui::{
     PageAction, Page, NavigableList, ListPage, feed::FeedPage, Selectable};
 use crate::config::FeedConfig;
-
+use crate::app::FeedState;
 
 /// Rows in the main page.
 enum MainRow {
     SectionHeader(String),
-    Feed(String),
+    Feed {
+        section_idx: usize,
+        feed_idx: usize,
+    },
     Spacer,
 }
 
@@ -29,18 +32,18 @@ pub struct MainPage {
 
 impl MainPage {
     /// Create a new main page.
-    pub fn new(config: FeedConfig) -> Self {
+    pub fn new(config: &FeedConfig) -> Self {
         // Build the rows for the main page.
         let mut rows = Vec::new();
 
         // Go through each section.
-        for section in config.sections.iter() {
+        for (section_idx, section) in config.sections.iter().enumerate() {
             // The first line of the section is the section title.
             rows.push(MainRow::SectionHeader(section.name.clone()));
 
             // Push the feeds into the section.
-            for feed in section.feeds.iter() {
-                rows.push(MainRow::Feed(feed.name.clone()));
+            for (feed_idx, _feed) in section.feeds.iter().enumerate() {
+                rows.push(MainRow::Feed { section_idx, feed_idx });
             }
 
             // Separate the section from other secitons.
@@ -54,7 +57,7 @@ impl MainPage {
 }
 
 impl Page for MainPage {
-    fn draw(&mut self, f: &mut Frame) {
+    fn draw(&mut self, f: &mut Frame, state: &FeedState) {
         // Build the list items.
         let items = self.list.items.iter().map(|row| match row {
             MainRow::SectionHeader(name) => {
@@ -66,10 +69,11 @@ impl Page for MainPage {
                 ))
             }
 
-            MainRow::Feed(name) => {
+            MainRow::Feed { section_idx, feed_idx } => {
+                let feed = state.get_feed(*section_idx, *feed_idx).unwrap();
                 ListItem::new(Line::from(vec![
                     Span::raw("      "),
-                    Span::raw(name.clone()),
+                    Span::raw(feed.name.clone()),
                 ]))
             }
 
@@ -92,6 +96,10 @@ impl Page for MainPage {
     }
 
     fn on_key(&mut self, key: KeyCode) -> PageAction {
+        let Some(selected) = self.list.selected_item() else {
+            return PageAction::None;
+        };
+
         match key {
             // Because the main page is the first page shown, the 'h' key will
             // be passed through to us instead of being handled in the app input
@@ -99,22 +107,30 @@ impl Page for MainPage {
 
             // Download the currently selected feed.
             KeyCode::Char('h') => {
-                PageAction::None
-            }
-
-            // Download all feeds.
-            KeyCode::Char('H') => {
-                PageAction::None
-            }
-
-            // Check the posts listing for the selected feed.
-            KeyCode::Enter | KeyCode::Char('l') => {
-                if let Some(MainRow::Feed(name)) = self.list.selected_item() {
-                    PageAction::Push(Box::new(FeedPage::new(name.clone())))
+                if let MainRow::Feed { section_idx, feed_idx } = selected {
+                    PageAction::DownloadFeed {
+                        section_idx: *section_idx,
+                        feed_idx: *feed_idx
+                    }
                 } else {
                     PageAction::None
                 }
-            }
+            },
+
+            // Download all feeds.
+            KeyCode::Char('H') => {
+                PageAction::DownloadAllFeeds
+            },
+
+            // Check the posts listing for the selected feed.
+            KeyCode::Enter | KeyCode::Char('l') => {
+                if let MainRow::Feed { .. } = selected {
+                    PageAction::NewPage(
+                        Box::new(FeedPage::new("test".to_string())))
+                } else {
+                    PageAction::None
+                }
+            },
 
             _ => PageAction::None,
         }

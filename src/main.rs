@@ -1,8 +1,7 @@
 use std::io;
-
-use crossterm::{
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+use crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen,
+    LeaveAlternateScreen
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 
@@ -18,16 +17,16 @@ fn main() -> io::Result<()> {
     // Set up the terminal.
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    crossterm::execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
     // Run the app!
-    nia::tui::App::new(feeds).run(&mut terminal);
+    nia::app::App::new(feeds).run(&mut terminal);
 
     // Restore the terminal.
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    crossterm::execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
 
     Ok(())

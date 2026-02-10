@@ -28,7 +28,13 @@ pub struct Feed {
 
     /// The provided url of this feed.
     pub url: String,
+
+    /// The posts in the feed.
+    pub posts: Vec<Post>,
 }
+
+#[derive(Debug, Clone)]
+pub struct Post;
 
 impl FeedConfig {
     /// Parse a config from any buffered reader.
@@ -150,7 +156,7 @@ impl Feed {
 
             // Validate the URL.
             if url.starts_with("https://") || url.starts_with("http://") {
-                Ok(Feed { name, url })
+                Ok(Feed { name, url, posts: Vec::new() })
             } else {
                 Err(io::Error::new(io::ErrorKind::Other, "Invalid URL."))
             }
