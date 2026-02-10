@@ -2,6 +2,7 @@
 
 use std::io::{self, BufRead};
 use std::path::PathBuf;
+use url::Url;
 
 /// A parsed config file.
 #[derive(Debug, Clone)]
@@ -27,7 +28,7 @@ pub struct Feed {
     pub name: String,
 
     /// The provided url of this feed.
-    pub url: String,
+    pub url: Url,
 
     /// The posts in the feed.
     pub posts: Vec<Post>,
@@ -163,14 +164,9 @@ impl Feed {
         // We expect `title | url`.
         if parts.len() == 2 {
             let name = parts[0].to_string();
-            let url = parts[1].to_string();
-
-            // Validate the URL.
-            if url.starts_with("https://") || url.starts_with("http://") {
-                Ok(Feed { name, url, posts: Vec::new() })
-            } else {
-                Err(io::Error::new(io::ErrorKind::Other, "Invalid URL."))
-            }
+            let url = Url::parse(parts[1])
+                .expect("Invalid URL specified for feed");
+            Ok(Feed { name, url, posts: Vec::new() })
         } else {
             Err(io::Error::new(io::ErrorKind::Other,
                 "Invalid line. Expected \"<title> | <url>\""))

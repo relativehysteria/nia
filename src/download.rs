@@ -1,10 +1,13 @@
 use std::thread;
 use std::sync::mpsc;
+use atom_syndication::Feed as AtomFeed;
+use rss::Channel as RssChannel;
+use url::Url;
 use crate::config::{FeedId, FeedConfig};
 
 /// A map of sections to feeds to URLs.
 #[derive(Debug)]
-pub struct UrlMap(pub Vec<Vec<String>>);
+pub struct UrlMap(pub Vec<Vec<Url>>);
 
 impl From<&FeedConfig> for UrlMap {
     /// Given a feed config, create a `FeedId -> URL` map.
@@ -17,9 +20,9 @@ impl From<&FeedConfig> for UrlMap {
                     .feeds
                     .iter()
                     .map(|feed| feed.url.clone())
-                    .collect::<Vec<String>>()
+                    .collect::<Vec<Url>>()
             })
-            .collect::<Vec<Vec<String>>>();
+            .collect::<Vec<Vec<Url>>>();
 
         Self(map)
     }
@@ -28,15 +31,15 @@ impl From<&FeedConfig> for UrlMap {
 /// A download request from the application to the downloader.
 pub enum DownloadRequest {
     /// Download a single feed.
-    DownloadFeed {
+    Feed {
         feed: FeedId,
-        url: String,
+        url: Url,
     },
 
     /// Download all feeds.
     ///
     /// The map here is
-    DownloadAll(UrlMap),
+    All(UrlMap),
 }
 
 /// A response from the downloader to the app.
@@ -70,14 +73,14 @@ impl DownloadChannel {
             while let Ok(request) = request_rx.recv() {
                 match request {
                     // Immediately start a downloader when downloading one feed.
-                    DownloadRequest::DownloadFeed { feed, url } => {
+                    DownloadRequest::Feed { feed, url } => {
                         let feed = vec![(feed, url)];
                         spawn_feed_downloader(feed, response_tx.clone());
                     },
 
                     // Start one downloader per section when downloading all
                     // feeds.
-                    DownloadRequest::DownloadAll(map) => {
+                    DownloadRequest::All(map) => {
                         let map = map.0.into_iter();
                         for (section_idx, section) in map.enumerate() {
                             let feeds = section
@@ -85,7 +88,7 @@ impl DownloadChannel {
                                 .enumerate()
                                 .map(|(feed_idx, url)| {
                                     (FeedId { section_idx, feed_idx, }, url)
-                                }).collect::<Vec<(FeedId, String)>>();
+                                }).collect::<Vec<(FeedId, Url)>>();
 
                             spawn_feed_downloader(feeds, response_tx.clone());
                         }
@@ -101,7 +104,7 @@ impl DownloadChannel {
 
 /// Spawn a thread that download `feeds` sequentially.
 fn spawn_feed_downloader(
-    feeds: Vec<(FeedId, String)>,
+    feeds: Vec<(FeedId, Url)>,
     response_tx: mpsc::Sender<DownloadResponse>,
 ) {
     std::thread::spawn(move || {
@@ -110,12 +113,90 @@ fn spawn_feed_downloader(
             let _ = response_tx.send(DownloadResponse::Started(feed.clone()));
 
             // Do the actual download.
-            let result = reqwest::blocking::get(url)
+            let result = reqwest::blocking::get(String::from(url))
                 .and_then(|r| r.error_for_status())
                 .and_then(|r| r.text());
 
+            // If we got an error for this feed, just go next.
+            let Ok(body) = result else {
+                let _ = response_tx.send(
+                    DownloadResponse::Finished(feed.clone()));
+                continue;
+            };
+
+            // Extract the urls.
+            let urls = if let Ok(atom) = body.parse::<AtomFeed>() {
+                extract_from_atom(&atom)
+            } else if let Ok(rss) = body.parse::<RssChannel>() {
+                extract_from_rss(&rss)
+            } else {
+                Vec::new()
+            };
+
+            let urls: Vec<String> = urls.into_iter()
+                .map(|url| String::from(url))
+                .collect();
+
             // Tell the app we have finished the download.
-            let _ = response_tx.send(DownloadResponse::Finished(feed.clone()));
+            let _ = response_tx.send(DownloadResponse::Finished(feed));
         }
     });
+}
+
+/// Parse a valid URL from `s` and push it into `acc`.
+fn push_url(acc: &mut Vec<Url>, s: &str) {
+    if let Ok(url) = Url::parse(s) {
+        acc.push(url);
+    }
+}
+
+/// Parse valid URLs from `s` and push them into `acc`.
+fn extract_urls_from_text(acc: &mut Vec<Url>, s: &str) {
+    // TODO: This is a super dumb extractor and will miss most links.
+    // Come up with something better; maybe an xml parser on the content?
+    for word in s.split_whitespace() {
+        push_url(acc, word);
+    }
+}
+
+/// Extract URLs from an Atom feed.
+fn extract_from_atom(feed: &AtomFeed) -> Vec<Url> {
+    let mut urls = Vec::new();
+
+    for entry in feed.entries() {
+        for link in entry.links() {
+            push_url(&mut urls, link.href())
+        }
+
+        if let Some(content) = entry.content().and_then(|c| c.value()) {
+            extract_urls_from_text(&mut urls, content);
+        }
+
+        if let Some(summary) = entry.summary() {
+            extract_urls_from_text(&mut urls, summary);
+        }
+    }
+
+    urls
+}
+
+/// Extract URLs from an RSS feed.
+fn extract_from_rss(channel: &RssChannel) -> Vec<Url> {
+    let mut urls = Vec::new();
+
+    for item in channel.items() {
+        if let Some(link) = item.link() {
+            push_url(&mut urls, link);
+        }
+
+        if let Some(desc) = item.description() {
+            extract_urls_from_text(&mut urls, desc);
+        }
+
+        if let Some(content) = item.content() {
+            extract_urls_from_text(&mut urls, content);
+        }
+    }
+
+    urls
 }

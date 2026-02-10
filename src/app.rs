@@ -105,7 +105,7 @@ impl App {
         let url = self.feed_state.get_feed(&feed).unwrap().url.clone();
         self.download
             .request_tx
-            .send(DownloadRequest::DownloadFeed { feed, url })
+            .send(DownloadRequest::Feed { feed, url })
             .expect("The downloader has closed abruptly.");
     }
 
@@ -127,7 +127,7 @@ impl App {
         // Send the request to the downloader.
         self.download
             .request_tx
-            .send(DownloadRequest::DownloadAll(url_map))
+            .send(DownloadRequest::All(url_map))
             .expect("The downloader has closed abruptly.");
     }
 
