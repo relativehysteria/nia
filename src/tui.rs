@@ -150,7 +150,7 @@ impl Spinner {
     }
 
     /// Returns the current frame of the animation.
-    pub fn current(&self) -> char {
+    pub fn frame(&self) -> char {
         Self::UNICODE_SPINNER[self.frame_idx]
     }
 

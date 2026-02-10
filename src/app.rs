@@ -10,8 +10,8 @@ pub struct FeedState {
     /// State of the feeds.
     pub feed_config: FeedConfig,
 
-    /// Number of currently active downloads.
-    pub active_downloads: usize,
+    /// Vector of feeds that are currently being downloaded.
+    pub downloading: Vec<FeedId>,
 
     /// A global spinner that can be used to draw a spin animation.
     pub spinner: Spinner,
@@ -22,15 +22,27 @@ impl FeedState {
     pub fn new(feed_config: FeedConfig) -> Self {
         Self {
             feed_config,
-            active_downloads: 0,
+            downloading: Vec::new(),
             spinner: Spinner::new(),
         }
     }
 
+    /// Check whether the `feed_id` is being currently downloaded.
+    pub fn is_downloading(&self, feed_id: &FeedId) -> bool {
+        self.downloading.contains(&feed_id)
+    }
+
     /// Get a reference to a feed.
-    pub fn get_feed(&self, feed_id: FeedId) -> Option<&Feed> {
+    pub fn get_feed(&self, feed_id: &FeedId) -> Option<&Feed> {
         self.feed_config.sections.get(feed_id.section_idx)
             .map(|section| section.feeds.get(feed_id.feed_idx))
+            .flatten()
+    }
+
+    /// Get a mutable reference to a feed.
+    pub fn get_feed_mut(&mut self, feed_id: &FeedId) -> Option<&mut Feed> {
+        self.feed_config.sections.get_mut(feed_id.section_idx)
+            .map(|section| section.feeds.get_mut(feed_id.feed_idx))
             .flatten()
     }
 }
@@ -70,7 +82,7 @@ impl App {
 
             // If there's an active download, we have to do ticks because of
             // animations and polls and stuff.
-            if self.feed_state.active_downloads > 0 {
+            if self.feed_state.downloading.len() > 0 {
                 // Our input handler _blocks_, so we will poll for events on a
                 // timeout and only call the handler when we get an event.
                 let timeout = tick_rate
@@ -83,7 +95,7 @@ impl App {
                     }
                 }
 
-                // Animate the spinner.
+                // Animate the global spinner.
                 if last_tick.elapsed() >= tick_rate {
                     let now = Instant::now();
                     self.feed_state.spinner.tick(now);
@@ -108,6 +120,11 @@ impl App {
     /// Draw the page.
     fn draw(&mut self, f: &mut Frame) {
         self.pages.last_mut().unwrap().draw(f, &self.feed_state);
+    }
+
+    /// Start downloading a single feed.
+    fn start_download(&mut self, feed: FeedId) {
+        self.feed_state.downloading.push(feed);
     }
 
     /// Handle the input for the app in a blocking manner.
@@ -151,7 +168,7 @@ impl App {
             PageAction::None => {},
             PageAction::NewPage(p) => self.pages.push(p),
             PageAction::DownloadFeed(feed_id) => {
-                self.feed_state.active_downloads += 1;
+                self.start_download(feed_id);
             },
             PageAction::DownloadAllFeeds => {
             },

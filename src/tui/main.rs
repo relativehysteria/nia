@@ -57,6 +57,10 @@ impl Page for MainPage {
     fn draw(&mut self, f: &mut Frame, state: &FeedState) {
         // Build the list items.
         let items = self.list.items.iter().map(|row| match row {
+            MainRow::Spacer => {
+                ListItem::new("")
+            }
+
             MainRow::SectionHeader(name) => {
                 ListItem::new(Line::styled(
                     format!("────┤ {} ├────", name),
@@ -67,15 +71,18 @@ impl Page for MainPage {
             }
 
             MainRow::Feed(feed_id) => {
-                let feed = state.get_feed(feed_id.clone()).unwrap();
+                // If the feed is being downloaded, prepend it with a spinner.
+                let spinner = if state.is_downloading(&feed_id) {
+                    state.spinner.frame()
+                } else {
+                    ' '
+                };
+
+                let feed = state.get_feed(&feed_id).unwrap();
                 ListItem::new(Line::from(vec![
-                    Span::raw("      "),
+                    Span::raw(format!("   {}  ", spinner)),
                     Span::raw(feed.name.clone()),
                 ]))
-            }
-
-            MainRow::Spacer => {
-                ListItem::new("")
             }
         });
 

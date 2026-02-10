@@ -38,7 +38,7 @@ pub struct Feed {
 pub struct Post;
 
 /// Feed index information.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FeedId {
     /// Index into `FeedConfig.sections`.
     pub section_idx: usize,
