@@ -46,7 +46,7 @@ impl Page for FeedPage {
         &mut self.list
     }
 
-    fn on_key(&mut self, key: KeyCode, state: &FeedState) -> PageAction {
+    fn on_key(&mut self, key: KeyCode, _state: &FeedState) -> PageAction {
         match key {
             // Check the post page of the selected post.
             KeyCode::Enter | KeyCode::Char('l') => {

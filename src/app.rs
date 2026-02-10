@@ -1,21 +1,30 @@
 use std::time::{Instant, Duration};
-use std::collections::HashSet;
+use std::collections::HashMap;
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::prelude::*;
 use crate::tui::{main, Page, PageAction, Spinner};
 use crate::config::{Feed, FeedId, FeedConfig};
-use crate::download::{DownloadChannel, DownloadRequest, DownloadResponse};
+use crate::download::*;
+
+/// The download state of this feed.
+enum DownloadState {
+    /// It is queued to be downloaded but is not being downloaded yet.
+    Queued,
+
+    /// Is being downloaded.
+    Downloading,
+}
 
 /// State of the feeds.
 pub struct FeedState {
-    /// State of the feeds.
-    pub feed_config: FeedConfig,
-
-    /// Vector of feeds that are currently being downloaded.
-    pub downloading: HashSet<FeedId>,
-
     /// A global spinner that can be used to draw a spin animation.
     pub spinner: Spinner,
+
+    /// State of the feeds.
+    feed_config: FeedConfig,
+
+    /// A map of feeds that are currently queued to be downloaded.
+    downloading: HashMap<FeedId, DownloadState>,
 }
 
 impl FeedState {
@@ -23,14 +32,16 @@ impl FeedState {
     pub fn new(feed_config: FeedConfig) -> Self {
         Self {
             feed_config,
-            downloading: HashSet::new(),
+            downloading: HashMap::new(),
             spinner: Spinner::new(),
         }
     }
 
     /// Check whether the `feed_id` is being currently downloaded.
     pub fn is_downloading(&self, feed_id: &FeedId) -> bool {
-        self.downloading.contains(&feed_id)
+        self.downloading.get(&feed_id)
+            .map(|state| matches!(state, DownloadState::Downloading))
+            .unwrap_or(false)
     }
 
     /// Get a reference to a feed.
@@ -87,21 +98,37 @@ impl App {
         // Immediately mark the feed as being downloaded instead of waiting for
         // the download task to tell us that the download has started.
         // We do this so the `App::run()` loop can start ticking immediately.
-        self.feed_state.downloading.insert(feed.clone());
+        self.feed_state.downloading.insert(feed.clone(), DownloadState::Queued);
 
 
-        // Send a request to the downloader
+        // Send the request to the downloader.
         let url = self.feed_state.get_feed(&feed).unwrap().url.clone();
-        self.download.request_tx.send(DownloadRequest::DownloadFeed {
-            feed, url
-        }).expect("The downloader has closed abruptly.");
+        self.download
+            .request_tx
+            .send(DownloadRequest::DownloadFeed { feed, url })
+            .expect("The downloader has closed abruptly.");
     }
 
     /// Download all feeds.
     ///
     /// One downloader is spawned for each section.
     fn download_all(&mut self) {
-        // TODO: Tell the downloader that we want to download all feeds.
+        // Build the URL map for the request.
+        let url_map = UrlMap::from(&self.feed_state.feed_config);
+
+        // Queue up all feeds.
+        for (section_idx, section) in url_map.0.iter().enumerate() {
+            for (feed_idx, _) in section.iter().enumerate() {
+                let feed = FeedId { section_idx, feed_idx };
+                self.feed_state.downloading.insert(feed, DownloadState::Queued);
+            }
+        }
+
+        // Send the request to the downloader.
+        self.download
+            .request_tx
+            .send(DownloadRequest::DownloadAll(url_map))
+            .expect("The downloader has closed abruptly.");
     }
 
     /// Handle events from the background downloader _in a non-blocking manner_.
@@ -113,12 +140,13 @@ impl App {
                 },
                 Ok(response) => {
                     match response {
+                        DownloadResponse::DownloadStarted(feed) => {
+                            self.feed_state.downloading.insert(
+                                feed, DownloadState::Downloading);
+                        },
                         DownloadResponse::DownloadFinished(feed) => {
                             self.feed_state.downloading.remove(&feed);
-                        }
-                        DownloadResponse::DownloadStarted(feed) => {
-                            self.feed_state.downloading.insert(feed);
-                        }
+                        },
                     }
                 },
                 Err(_) => return,
@@ -139,7 +167,7 @@ impl App {
 
             // If there's an active download, we have to do ticks because of
             // animations and polls and stuff.
-            if self.feed_state.downloading.len() > 0 {
+            if !self.feed_state.downloading.is_empty() {
                 // Handle events from the background downloader.
                 self.handle_download_events();
 
@@ -208,14 +236,10 @@ impl App {
         // We haven't handled the input above. The page might wanna handle it
         // instead.
         match page.on_key(key.code, &self.feed_state) {
-            PageAction::None => {},
-            PageAction::NewPage(p) => self.pages.push(p),
-            PageAction::DownloadFeed(feed_id) => {
-                self.start_download(feed_id);
-            },
-            PageAction::DownloadAllFeeds => {
-                self.download_all();
-            },
+            PageAction::None                  => {},
+            PageAction::NewPage(p)            => self.pages.push(p),
+            PageAction::DownloadFeed(feed_id) => self.start_download(feed_id),
+            PageAction::DownloadAllFeeds      => self.download_all(),
         }
 
         false
