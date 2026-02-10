@@ -179,9 +179,9 @@ mod tests {
     use super::*;
     use std::io::Cursor;
 
-    fn parse_str(input: &str) -> io::Result<Config> {
+    fn parse_str(input: &str) -> io::Result<FeedConfig> {
         let cursor = Cursor::new(input);
-        Config::parse_reader(cursor)
+        FeedConfig::parse_reader(cursor)
     }
 
     #[test]
