@@ -42,10 +42,10 @@ pub enum DownloadRequest {
 /// A response from the downloader to the app.
 pub enum DownloadResponse {
     /// The downloader has started downloading a feed.
-    DownloadStarted(FeedId),
+    Started(FeedId),
 
     /// The downloader has finished downloading a feed.
-    DownloadFinished(FeedId),
+    Finished(FeedId),
 }
 
 /// The application end of the channel between the application and the
@@ -69,18 +69,25 @@ impl DownloadChannel {
         thread::spawn(move || {
             while let Ok(request) = request_rx.recv() {
                 match request {
+                    // Immediately start a downloader when downloading one feed.
                     DownloadRequest::DownloadFeed { feed, url } => {
-                        let _ = response_tx.send(
-                            DownloadResponse::DownloadStarted(feed));
+                        let feed = vec![(feed, url)];
+                        spawn_feed_downloader(feed, response_tx.clone());
                     },
+
+                    // Start one downloader per section when downloading all
+                    // feeds.
                     DownloadRequest::DownloadAll(map) => {
-                        for (section_idx, section) in map.0.iter().enumerate() {
-                            for (feed_idx, _) in section.iter().enumerate() {
-                                let feed = FeedId { section_idx, feed_idx };
-                                let _ = response_tx.send(
-                                    DownloadResponse::DownloadStarted(feed));
-                                break;
-                            }
+                        let map = map.0.into_iter();
+                        for (section_idx, section) in map.enumerate() {
+                            let feeds = section
+                                .into_iter()
+                                .enumerate()
+                                .map(|(feed_idx, url)| {
+                                    (FeedId { section_idx, feed_idx, }, url)
+                                }).collect::<Vec<(FeedId, String)>>();
+
+                            spawn_feed_downloader(feeds, response_tx.clone());
                         }
                     },
                 }
@@ -90,4 +97,25 @@ impl DownloadChannel {
         // Return the application end
         Self { request_tx, response_rx }
     }
+}
+
+/// Spawn a thread that download `feeds` sequentially.
+fn spawn_feed_downloader(
+    feeds: Vec<(FeedId, String)>,
+    response_tx: mpsc::Sender<DownloadResponse>,
+) {
+    std::thread::spawn(move || {
+        for (feed, url) in feeds.into_iter() {
+            // Tell the app we have started the download.
+            let _ = response_tx.send(DownloadResponse::Started(feed.clone()));
+
+            // Do the actual download.
+            let result = reqwest::blocking::get(url)
+                .and_then(|r| r.error_for_status())
+                .and_then(|r| r.text());
+
+            // Tell the app we have finished the download.
+            let _ = response_tx.send(DownloadResponse::Finished(feed.clone()));
+        }
+    });
 }

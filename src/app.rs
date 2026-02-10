@@ -133,23 +133,15 @@ impl App {
 
     /// Handle events from the background downloader _in a non-blocking manner_.
     fn handle_download_events(&mut self) {
-        loop {
-            match self.download.response_rx.try_recv() {
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    panic!("The downloader has closed abruptly.");
+        for response in self.download.response_rx.try_iter() {
+            match response {
+                DownloadResponse::Started(feed) => {
+                    self.feed_state.downloading.insert(
+                        feed, DownloadState::Downloading);
                 },
-                Ok(response) => {
-                    match response {
-                        DownloadResponse::DownloadStarted(feed) => {
-                            self.feed_state.downloading.insert(
-                                feed, DownloadState::Downloading);
-                        },
-                        DownloadResponse::DownloadFinished(feed) => {
-                            self.feed_state.downloading.remove(&feed);
-                        },
-                    }
+                DownloadResponse::Finished(feed) => {
+                    self.feed_state.downloading.remove(&feed);
                 },
-                Err(_) => return,
             }
         }
     }
