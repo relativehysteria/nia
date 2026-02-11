@@ -4,38 +4,55 @@ use ratatui::{
 };
 use crate::tui::{Page, NavigableList, ListPage};
 use crate::app::FeedState;
+use crate::config::FeedId;
+
+impl crate::tui::Selectable for url::Url {
+    fn selectable(&self) -> bool {
+        true
+    }
+}
 
 /// The post page that lists out all URLs in a post.
 pub struct PostPage {
-    /// The title of this post.
-    title: String,
+    /// The identifier of this post's feed.
+    feed_id: FeedId,
+
+    /// The index of this post within the feed.
+    post_idx: usize,
 
     /// List of rows on the post page.
     ///
     /// In this case, each row is a URL in this post.
-    list: ListPage<String>,
+    list: ListPage<url::Url>,
 }
 
 impl PostPage {
-    pub fn new(title: String) -> Self {
-        // Fake for now
-        let rows = vec!["post test 1".to_string(), "post test 2".to_string()];
-
-        Self { title, list: ListPage::new(rows), }
+    pub fn new(feed_id: FeedId, post_idx: usize) -> Self {
+        Self { feed_id, post_idx, list: ListPage::new(Vec::new()) }
     }
 }
 
 impl Page for PostPage {
-    fn draw(&mut self, f: &mut Frame, _state: &FeedState) {
-        let items = self.list.items.iter().map(|title| {
-            ListItem::new(title.as_str())
+    fn draw(&mut self, f: &mut Frame, state: &FeedState) {
+        // Get this post state.
+        let feed = state.get_feed(&self.feed_id).unwrap();
+        let post = &feed.posts[self.post_idx];
+
+        // Rebuild the URL list if the lengths differ.
+        if self.list.items.len() != post.urls.len() {
+            self.list = ListPage::new(post.urls.clone());
+        }
+
+        let items = post.urls.iter().enumerate().map(|(idx, url)| {
+            ListItem::new(Line::from(vec![
+                Span::raw(format!("{:>3}  │  ", idx)),
+                Span::raw(url.to_string()),
+            ]))
         });
 
-        let title = self.title.as_str();
-
-        let list = List::new(items)
-            .block(Block::default().borders(Borders::ALL).title(title))
-            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+        let section = &state.get_section(self.feed_id.section_idx).unwrap().name;
+        let title = format!(" {} | {} | {} ", section, feed.name, &post.name);
+        let list = crate::tui::build_list(&title, items);
 
         f.render_stateful_widget(list, f.area(), &mut self.list.state);
     }

@@ -45,7 +45,7 @@ impl Page for FeedPage {
                 Span::raw(format!("{:>5}", idx.to_string())),
                 Span::raw(post.published
                     .format("  ┊  %Y-%m-%d  │  ").to_string()),
-                Span::raw(post.name.as_str())
+                Span::raw(post.name.as_str()),
             ]))
         });
 
@@ -64,10 +64,9 @@ impl Page for FeedPage {
         match key {
             // Check the post page of the selected post.
             KeyCode::Enter | KeyCode::Char('l') => {
-                if let Some(selected) = self.list.selected_item() {
-                    // let title = selected.clone();
-                    // PageAction::NewPage(Box::new(PostPage::new(title)))
-                    PageAction::None
+                if let Some(&selected) = self.list.selected_item() {
+                    PageAction::NewPage(Box::new(
+                            PostPage::new(self.feed_id.clone(), selected)))
                 } else {
                     PageAction::None
                 }
