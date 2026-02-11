@@ -148,6 +148,8 @@ fn spawn_feed_downloader(
 
 /// Parse a valid URL from `s` and push it into `acc`.
 fn push_url(acc: &mut Vec<Url>, s: &str) {
+    // TODO: Handle relative links.
+
     // These checks are not expensive enough to warrant something more optimized
     if let Ok(url) = Url::parse(s) {
         if !acc.contains(&url) {

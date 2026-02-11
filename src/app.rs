@@ -221,6 +221,8 @@ impl App {
             KeyCode::Down | KeyCode::Char('j') => page.list().down(1),
             KeyCode::PageUp | KeyCode::Char('K') => page.list().up(10),
             KeyCode::PageDown | KeyCode::Char('J') => page.list().down(10),
+            KeyCode::Char('g') => page.list().up(usize::MAX),
+            KeyCode::Char('G') => page.list().down(usize::MAX),
             KeyCode::Char('q') => return true,
             _ => input_handled = false,
         }
