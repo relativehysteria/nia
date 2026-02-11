@@ -86,12 +86,7 @@ impl Page for MainPage {
             }
         });
 
-        let list = List::new(items)
-            .block(Block::default().borders(Borders::ALL).title("Feeds"))
-            .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
-            .highlight_symbol("")
-            .scroll_padding(4);
-
+        let list = crate::tui::build_list("Feeds", items);
         f.render_stateful_widget(list, f.area(), &mut self.list.state);
     }
 
@@ -131,8 +126,8 @@ impl Page for MainPage {
                     if feed.posts.len() == 0 {
                         PageAction::None
                     } else {
-                        let title = feed.name.clone();
-                        PageAction::NewPage(Box::new(FeedPage::new(title)))
+                        PageAction::NewPage(
+                            Box::new(FeedPage::new(feed_id.clone())))
                     }
 
                 } else {

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::prelude::*;
 use crate::tui::{main, Page, PageAction, Spinner};
-use crate::config::{Feed, FeedId, FeedConfig};
+use crate::config::{Section, Feed, FeedId, FeedConfig};
 use crate::download::*;
 
 /// The download state of this feed.
@@ -51,11 +51,9 @@ impl FeedState {
             .flatten()
     }
 
-    /// Get a mutable reference to a feed.
-    pub fn get_feed_mut(&mut self, feed_id: &FeedId) -> Option<&mut Feed> {
-        self.feed_config.sections.get_mut(feed_id.section_idx)
-            .map(|section| section.feeds.get_mut(feed_id.feed_idx))
-            .flatten()
+    /// Get a reference to a section.
+    pub fn get_section(&self, section_idx: usize) -> Option<&Section> {
+        self.feed_config.sections.get(section_idx)
     }
 }
 
@@ -144,6 +142,10 @@ impl App {
                 },
                 DownloadResponse::Finished { feed, posts } => {
                     self.feed_state.downloading.remove(&feed);
+                    let mut posts = self.feed_state.feed_config
+                        .sections[feed.section_idx]
+                        .feeds[feed.feed_idx]
+                        .posts = posts;
                 },
             }
         }

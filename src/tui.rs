@@ -3,7 +3,10 @@ pub mod feed;
 pub mod post;
 
 use std::time::{Duration, Instant};
-use ratatui::{prelude::*, widgets::ListState};
+use ratatui::{
+    prelude::*,
+    widgets::{ListState, ListItem, List, Block, Borders}
+};
 use crossterm::event::KeyCode;
 use crate::app::FeedState;
 use crate::config::FeedId;
@@ -159,4 +162,25 @@ impl Spinner {
         self.frame_idx = 0;
         self.last_tick = Instant::now();
     }
+}
+
+/// Helper function to build the page list.
+fn build_list<'a, T>(title: &'a str, items: T) -> List<'a>
+where
+    T: IntoIterator,
+    <T as IntoIterator>::Item: Into<ListItem<'a>>
+{
+    List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(title),
+        )
+        .highlight_style(
+            Style::default()
+                .add_modifier(Modifier::ITALIC)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol(" ")
+        .scroll_padding(4)
 }
