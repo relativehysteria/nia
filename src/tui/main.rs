@@ -1,6 +1,6 @@
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, List, ListItem},
+    widgets::ListItem,
 };
 use crossterm::event::KeyCode;
 use crate::tui::{
@@ -86,7 +86,7 @@ impl Page for MainPage {
             }
         });
 
-        let list = crate::tui::build_list("Feeds", items);
+        let list = crate::tui::build_list(" Feeds ", items);
         f.render_stateful_widget(list, f.area(), &mut self.list.state);
     }
 

@@ -141,11 +141,11 @@ impl App {
                     self.feed_state.downloading.remove(&feed);
                 },
                 DownloadResponse::Finished { feed, posts } => {
-                    self.feed_state.downloading.remove(&feed);
-                    let mut posts = self.feed_state.feed_config
+                    self.feed_state.feed_config
                         .sections[feed.section_idx]
                         .feeds[feed.feed_idx]
                         .posts = posts;
+                    self.feed_state.downloading.remove(&feed);
                 },
             }
         }

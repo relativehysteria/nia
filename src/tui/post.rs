@@ -1,6 +1,6 @@
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, List, ListItem},
+    widgets::ListItem,
 };
 use crate::tui::{Page, NavigableList, ListPage};
 use crate::app::FeedState;

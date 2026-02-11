@@ -1,6 +1,6 @@
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, List, ListItem},
+    widgets::ListItem,
 };
 use crossterm::event::KeyCode;
 use crate::tui::{PageAction, Page, NavigableList, ListPage, post::PostPage};
