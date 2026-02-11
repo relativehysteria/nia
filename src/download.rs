@@ -102,7 +102,7 @@ impl DownloadChannel {
     }
 }
 
-/// Spawn a thread that download `feeds` sequentially.
+/// Spawn a thread that downloads `feeds` sequentially.
 fn spawn_feed_downloader(
     feeds: Vec<(FeedId, Url)>,
     response_tx: mpsc::Sender<DownloadResponse>,
@@ -152,10 +152,11 @@ fn push_url(acc: &mut Vec<Url>, s: &str) {
 
 /// Parse valid URLs from `s` and push them into `acc`.
 fn extract_urls_from_text(acc: &mut Vec<Url>, s: &str) {
-    // TODO: This is a super dumb extractor and will miss most links.
-    // Come up with something better; maybe an xml parser on the content?
-    for word in s.split_whitespace() {
-        push_url(acc, word);
+    let mut finder = linkify::LinkFinder::new();
+    finder.kinds(&[linkify::LinkKind::Url]);
+
+    for link in finder.links(s).map(|link| link.as_str()) {
+        push_url(acc, link);
     }
 }
 
