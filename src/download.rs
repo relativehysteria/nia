@@ -3,7 +3,7 @@ use std::sync::mpsc;
 use atom_syndication::Feed as AtomFeed;
 use rss::Channel as RssChannel;
 use url::Url;
-use crate::config::{FeedId, FeedConfig};
+use crate::config::{FeedId, FeedConfig, Post};
 
 /// A map of sections to feeds to URLs.
 #[derive(Debug)]
@@ -47,8 +47,14 @@ pub enum DownloadResponse {
     /// The downloader has started downloading a feed.
     Started(FeedId),
 
+    /// The downloader couldn't download the feed.
+    Failed(FeedId),
+
     /// The downloader has finished downloading a feed.
-    Finished(FeedId),
+    Finished {
+        feed: FeedId,
+        posts: Vec<Post>,
+    },
 }
 
 /// The application end of the channel between the application and the
@@ -120,12 +126,12 @@ fn spawn_feed_downloader(
             // If we got an error for this feed, just go next.
             let Ok(body) = result else {
                 let _ = response_tx.send(
-                    DownloadResponse::Finished(feed.clone()));
+                    DownloadResponse::Failed(feed.clone()));
                 continue;
             };
 
             // Extract the urls.
-            let urls = if let Ok(atom) = body.parse::<AtomFeed>() {
+            let posts = if let Ok(atom) = body.parse::<AtomFeed>() {
                 extract_from_atom(&atom)
             } else if let Ok(rss) = body.parse::<RssChannel>() {
                 extract_from_rss(&rss)
@@ -133,12 +139,9 @@ fn spawn_feed_downloader(
                 Vec::new()
             };
 
-            let urls: Vec<String> = urls.into_iter()
-                .map(|url| String::from(url))
-                .collect();
-
             // Tell the app we have finished the download.
-            let _ = response_tx.send(DownloadResponse::Finished(feed));
+            let _ = response_tx
+                .send(DownloadResponse::Finished { feed, posts });
         }
     });
 }
@@ -161,10 +164,19 @@ fn extract_urls_from_text(acc: &mut Vec<Url>, s: &str) {
 }
 
 /// Extract URLs from an Atom feed.
-fn extract_from_atom(feed: &AtomFeed) -> Vec<Url> {
-    let mut urls = Vec::new();
+fn extract_from_atom(feed: &AtomFeed) -> Vec<Post> {
+    let mut posts = Vec::new();
 
+    // Go through each post.
     for entry in feed.entries() {
+        // Set the metadata for this post.
+        let id = entry.id.clone();
+        let name = entry.title.value.clone();
+        let published = entry.updated.to_utc();
+
+        // Parse the URLs from this post.
+        let mut urls = Vec::new();
+
         for link in entry.links() {
             push_url(&mut urls, link.href())
         }
@@ -176,16 +188,37 @@ fn extract_from_atom(feed: &AtomFeed) -> Vec<Url> {
         if let Some(summary) = entry.summary() {
             extract_urls_from_text(&mut urls, summary);
         }
+
+        // Save the post.
+        posts.push(Post { urls, id, name, published });
     }
 
-    urls
+    posts
 }
 
 /// Extract URLs from an RSS feed.
-fn extract_from_rss(channel: &RssChannel) -> Vec<Url> {
-    let mut urls = Vec::new();
+fn extract_from_rss(channel: &RssChannel) -> Vec<Post> {
+    let mut posts = Vec::new();
 
+    // Go through each post.
     for item in channel.items() {
+        // Set the metadata for this post. Unlike Atom, RSS requires almost no
+        // metadata for posts. If we don't have much to work with, we'll do it
+        // ourselves.
+        let name = item.title.clone()
+            .or_else(|| item.description.as_ref()
+                .map(|d| truncate_chars(&d, 20)))
+            .unwrap_or_else(|| "Untitled".to_string());
+        let published = item.pub_date.as_ref()
+            .and_then(|date| chrono::DateTime::parse_from_rfc2822(&date).ok())
+            .map(|date| date.with_timezone(&chrono::Utc))
+            .unwrap_or_else(|| chrono::Utc::now());
+        let id = item.guid.as_ref().map(|g| g.value.clone())
+            .unwrap_or_else(|| hash(&format!("{:?} {:?}", published, name)));
+
+        // Parse the URLs from this post.
+        let mut urls = Vec::new();
+
         if let Some(link) = item.link() {
             push_url(&mut urls, link);
         }
@@ -197,7 +230,30 @@ fn extract_from_rss(channel: &RssChannel) -> Vec<Url> {
         if let Some(content) = item.content() {
             extract_urls_from_text(&mut urls, content);
         }
+
+        // Save the post.
+        posts.push(Post { id, name, urls, published });
     }
 
-    urls
+    posts
+}
+
+/// A function that generates a stable hash for `s`.
+fn hash(s: &str) -> String {
+    const FNV_OFFSET: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x100000001b3;
+
+    let mut hash = FNV_OFFSET;
+
+    for byte in s.as_bytes() {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+
+    hash.to_string()
+}
+
+// Utility function to truncate a string to at most `n` characters safely.
+fn truncate_chars(s: &str, n: usize) -> String {
+    s.chars().take(n).collect()
 }

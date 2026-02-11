@@ -3,6 +3,7 @@
 use std::io::{self, BufRead};
 use std::path::PathBuf;
 use url::Url;
+use chrono::{DateTime, Utc};
 
 /// A parsed config file.
 #[derive(Debug, Clone)]
@@ -36,7 +37,19 @@ pub struct Feed {
 
 /// A single post in a feed.
 #[derive(Debug, Clone)]
-pub struct Post;
+pub struct Post {
+    /// Identifier of the post.
+    pub id: String,
+
+    /// Title of this post.
+    pub name: String,
+
+    /// The URLs present in this post.
+    pub urls: Vec<Url>,
+
+    /// Time when the feed was published (for RSS) or updated (for Atom).
+    pub published: DateTime<Utc>,
+}
 
 /// Feed index information.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

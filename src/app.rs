@@ -139,7 +139,10 @@ impl App {
                     self.feed_state.downloading.insert(
                         feed, DownloadState::Downloading);
                 },
-                DownloadResponse::Finished(feed) => {
+                DownloadResponse::Failed(feed) => {
+                    self.feed_state.downloading.remove(&feed);
+                },
+                DownloadResponse::Finished { feed, posts } => {
                     self.feed_state.downloading.remove(&feed);
                 },
             }
