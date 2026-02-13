@@ -118,7 +118,23 @@ impl App {
         for (section_idx, section) in url_map.0.iter().enumerate() {
             for (feed_idx, _) in section.iter().enumerate() {
                 let feed = FeedId { section_idx, feed_idx };
-                self.feed_state.downloading.insert(feed, DownloadState::Queued);
+
+                // If we're already downloading something, do not change the
+                // queue state.
+                //
+                // NOTE We intentionally do not remove feeds from the map while
+                // downloading. `FeedId` is index-based (section_idx, feed_idx),
+                // so removing a feed would shift indices and invalidate
+                // existing IDs.
+                //
+                // Re-queuing a feed that is already downloading is not ideal,
+                // but in practice this is unlikely for my use case
+                // (downloading all feeds at app startup), so we accept the
+                // trade-off.
+                if !self.feed_state.downloading.contains_key(&feed) {
+                    self.feed_state.downloading
+                        .insert(feed, DownloadState::Queued);
+                }
             }
         }
 
