@@ -49,13 +49,14 @@ impl Posts {
 
     /// Insert a new post into the vector.
     pub fn insert(&mut self, post: Post) {
-        let idx = self.0.binary_search(&post).unwrap_or_else(|p| p);
+        let idx = self.0.binary_search_by(|p| p.cmp(&post).reverse())
+            .unwrap_or_else(|p| p);
         self.0.insert(idx, post);
     }
 
     /// Check if the vector contains `post` already.
     pub fn contains(&self, post: &Post) -> bool {
-        self.0.binary_search(&post).is_ok()
+        self.0.binary_search_by(|p| p.cmp(post).reverse()).is_ok()
     }
 
     /// Get the length of the posts vector.
