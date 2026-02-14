@@ -3,8 +3,9 @@ use std::collections::HashMap;
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::prelude::*;
 use crate::tui::{main, Page, PageAction, Spinner};
-use crate::config::{Section, Feed, FeedId, FeedConfig};
+use crate::config::{Section, Feed, FeedId, FeedConfig, Post};
 use crate::download::*;
+use crate::database::*;
 
 /// The download state of this feed.
 enum DownloadState {
@@ -51,13 +52,36 @@ impl FeedState {
             .flatten()
     }
 
+    /// Get a mutable reference to a feed.
+    pub fn get_feed_mut(&mut self, feed_id: &FeedId) -> Option<&mut Feed> {
+        self.feed_config.sections.get_mut(feed_id.section_idx)
+            .map(|section| section.feeds.get_mut(feed_id.feed_idx))
+            .flatten()
+    }
+
     /// Get a reference to a section.
     pub fn get_section(&self, section_idx: usize) -> Option<&Section> {
         self.feed_config.sections.get(section_idx)
     }
+
+    /// Check if the `feed` contains the following `post`.
+    pub fn contains_post(&self, feed: &FeedId, post: &Post) -> bool {
+        self.get_feed(feed)
+            .map(|feed| feed.posts.contains(post))
+            .unwrap()
+    }
+
+    /// Insert new `posts` into `feed`.
+    pub fn insert_posts(&mut self, feed: &FeedId, posts: &[Post]) {
+        let feed = self.get_feed_mut(feed).unwrap();
+        feed.posts.extend_from_slice(posts);
+    }
 }
 
 /// The application state.
+///
+/// The downloads and database are handled in separate threads that are started
+/// at the creation of the application.
 pub struct App {
     /// The TUI page stack.
     pages: Vec<Box<dyn Page>>,
@@ -67,6 +91,9 @@ pub struct App {
 
     /// State of the background feed downloader.
     download: DownloadChannel,
+
+    /// State of the background feed storage.
+    database: DatabaseChannel,
 }
 
 impl App {
@@ -76,6 +103,7 @@ impl App {
             pages: vec![Box::new(main::MainPage::new(&feeds))],
             feed_state: FeedState::new(feeds),
             download: DownloadChannel::spawn_downloader_thread(),
+            database: DatabaseChannel::spawn_database_thread(),
         }
     }
 
@@ -157,10 +185,21 @@ impl App {
                     self.feed_state.downloading.remove(&feed);
                 },
                 DownloadResponse::Finished { feed, posts } => {
-                    self.feed_state.feed_config
-                        .sections[feed.section_idx]
-                        .feeds[feed.feed_idx]
-                        .posts = posts;
+                    // Retain only new posts.
+                    let new_posts = posts.into_iter()
+                        .filter(|p| !self.feed_state.contains_post(&feed, p))
+                        .collect::<Vec<Post>>();
+
+                    // Save them in the feed.
+                    self.feed_state.insert_posts(&feed, &new_posts);
+
+                    // Save them in the database.
+                    self.database.request_tx.send(DatabaseRequest::SavePosts {
+                        feed: feed.clone(),
+                        posts: new_posts,
+                    }).expect("The database channel closed abruptly.");
+
+                    // Remove the feed's downloading status.
                     self.feed_state.downloading.remove(&feed);
                 },
             }
@@ -250,7 +289,7 @@ impl App {
 
         // We haven't handled the input above. The page might wanna handle it
         // instead.
-        match page.on_key(key.code, &self.feed_state) {
+        match page.on_key(key.code, &mut self.feed_state) {
             PageAction::None                  => {},
             PageAction::NewPage(p)            => self.pages.push(p),
             PageAction::DownloadFeed(feed_id) => self.start_download(feed_id),

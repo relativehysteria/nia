@@ -35,11 +35,22 @@ pub struct Feed {
     pub posts: Vec<Post>,
 }
 
+/// A post identifier
+#[repr(transparent)]
+#[derive(Eq, PartialEq, Debug, Clone)]
+pub struct PostId(pub String);
+
+impl From<String> for PostId {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
 /// A single post in a feed.
 #[derive(Debug, Clone)]
 pub struct Post {
     /// Identifier of the post.
-    pub id: String,
+    pub id: PostId,
 
     /// Title of this post.
     pub name: String,
@@ -49,6 +60,29 @@ pub struct Post {
 
     /// Time when the feed was published (for RSS) or updated (for Atom).
     pub published: DateTime<Utc>,
+
+    /// Whether this post has been read or not.
+    pub read: bool,
+}
+
+impl PartialEq for Post {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for Post {}
+
+impl PartialOrd for Post {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.published.partial_cmp(&other.published)
+    }
+}
+
+impl Ord for Post {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.published.cmp(&other.published)
+    }
 }
 
 /// Feed index information.

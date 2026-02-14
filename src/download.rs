@@ -103,7 +103,7 @@ impl DownloadChannel {
             }
         });
 
-        // Return the application end
+        // Return the application end.
         Self { request_tx, response_rx }
     }
 }
@@ -131,13 +131,16 @@ fn spawn_feed_downloader(
             };
 
             // Extract the urls.
-            let posts = if let Ok(atom) = body.parse::<AtomFeed>() {
+            let mut posts = if let Ok(atom) = body.parse::<AtomFeed>() {
                 extract_from_atom(&atom)
             } else if let Ok(rss) = body.parse::<RssChannel>() {
                 extract_from_rss(&rss)
             } else {
                 Vec::new()
             };
+
+            // Sort the posts by date.
+            posts.sort_unstable_by(|a, b| a.published.cmp(&b.published));
 
             // Tell the app we have finished the download.
             let _ = response_tx
@@ -168,14 +171,17 @@ fn extract_urls_from_text(acc: &mut Vec<Url>, s: &str) {
     }
 }
 
-/// Extract URLs from an Atom feed.
+/// Extract the posts from an Atom feed.
+///
+/// All of the posts will be marked as unread. It is up to the application to
+/// make sure that before read posts are marked as such.
 fn extract_from_atom(feed: &AtomFeed) -> Vec<Post> {
     let mut posts = Vec::new();
 
     // Go through each post.
     for entry in feed.entries() {
         // Set the metadata for this post.
-        let id = entry.id.clone();
+        let id = entry.id.clone().into();
         let name = entry.title.value.clone();
         let published = entry.updated.to_utc();
 
@@ -195,13 +201,17 @@ fn extract_from_atom(feed: &AtomFeed) -> Vec<Post> {
         }
 
         // Save the post.
-        posts.push(Post { urls, id, name, published });
+        let read = false;
+        posts.push(Post { urls, id, name, published, read });
     }
 
     posts
 }
 
-/// Extract URLs from an RSS feed.
+/// Extract the posts from an RSS feed.
+///
+/// All of the posts will be marked as unread. It is up to the application to
+/// make sure that before read posts are marked as such.
 fn extract_from_rss(channel: &RssChannel) -> Vec<Post> {
     let mut posts = Vec::new();
 
@@ -219,7 +229,8 @@ fn extract_from_rss(channel: &RssChannel) -> Vec<Post> {
             .map(|date| date.with_timezone(&chrono::Utc))
             .unwrap_or_else(|| chrono::Utc::now());
         let id = item.guid.as_ref().map(|g| g.value.clone())
-            .unwrap_or_else(|| hash(&format!("{:?} {:?}", published, name)));
+            .unwrap_or_else(|| hash(&format!("{:?} {:?}", published, name)))
+            .into();
 
         // Parse the URLs from this post.
         let mut urls = Vec::new();
@@ -237,7 +248,8 @@ fn extract_from_rss(channel: &RssChannel) -> Vec<Post> {
         }
 
         // Save the post.
-        posts.push(Post { id, name, urls, published });
+        let read = false;
+        posts.push(Post { id, name, urls, published, read });
     }
 
     posts
