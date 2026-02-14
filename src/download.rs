@@ -182,7 +182,7 @@ fn extract_from_atom(feed: &AtomFeed) -> Vec<Post> {
     for entry in feed.entries() {
         // Set the metadata for this post.
         let id = entry.id.clone().into();
-        let title = entry.title.value.clone();
+        let title = entry.title.value.clone().into();
         let published = entry.updated.to_utc();
 
         // Parse the URLs from this post.
@@ -223,7 +223,8 @@ fn extract_from_rss(channel: &RssChannel) -> Vec<Post> {
         let title = item.title.clone()
             .or_else(|| item.description.as_ref()
                 .map(|d| truncate_chars(&d, 20)))
-            .unwrap_or_else(|| "Untitled".to_string());
+            .unwrap_or_else(|| "Untitled".to_string())
+            .into();
         let published = item.pub_date.as_ref()
             .and_then(|date| chrono::DateTime::parse_from_rfc2822(&date).ok())
             .map(|date| date.with_timezone(&chrono::Utc))

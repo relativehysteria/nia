@@ -1,5 +1,6 @@
 //! Config parsing and stuff.
 
+use std::sync::Arc;
 use std::io::{self, BufRead};
 use std::path::PathBuf;
 use url::Url;
@@ -16,7 +17,7 @@ pub struct FeedConfig {
 #[derive(Debug, Clone)]
 pub struct Section {
     /// Title of the section.
-    pub title: String,
+    pub title: Arc<str>,
 
     /// A vector of the feeds in this section.
     pub feeds: Vec<Feed>,
@@ -26,7 +27,7 @@ pub struct Section {
 #[derive(Debug, Clone)]
 pub struct Feed {
     /// Title of this feed that will be shown in the TUI.
-    pub title: String,
+    pub title: Arc<str>,
 
     /// The provided url of this feed.
     pub url: Url,
@@ -76,11 +77,11 @@ impl Posts {
 /// A post identifier.
 #[repr(transparent)]
 #[derive(Eq, PartialEq, Debug, Clone, Hash)]
-pub struct PostId(pub String);
+pub struct PostId(pub Arc<str>);
 
 impl From<String> for PostId {
     fn from(s: String) -> Self {
-        Self(s)
+        Self(Arc::from(s))
     }
 }
 
@@ -91,7 +92,7 @@ pub struct Post {
     pub id: PostId,
 
     /// Title of this post.
-    pub title: String,
+    pub title: Arc<String>,
 
     /// The URLs present in this post.
     pub urls: Vec<Url>,
@@ -232,9 +233,9 @@ impl FeedConfig {
 
 impl Section {
     /// Create a new empty section.
-    fn new(title: String) -> Self {
+    fn new(title: impl Into<Arc<str>>) -> Self {
         Section {
-            title,
+            title: title.into(),
             feeds: Vec::new(),
         }
     }
@@ -248,7 +249,7 @@ impl Feed {
 
         // We expect `title | url`.
         if parts.len() == 2 {
-            let title = parts[0].to_string();
+            let title = parts[0].to_string().into();
             let url = Url::parse(parts[1])
                 .expect("Invalid URL specified for feed");
             Ok(Feed { title, url, posts: Posts::new() })

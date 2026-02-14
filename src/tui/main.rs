@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use ratatui::{
     prelude::*,
     widgets::ListItem,
@@ -10,7 +11,7 @@ use crate::app::FeedState;
 
 /// Rows in the main page.
 enum MainRow {
-    SectionHeader(String),
+    SectionHeader(Arc<str>),
     Feed(FeedId),
     Spacer,
 }
@@ -81,7 +82,7 @@ impl Page for MainPage {
                 let feed = state.get_feed(&feed_id).unwrap();
                 ListItem::new(Line::from(vec![
                     Span::raw(format!("   {}  ", spinner)),
-                    Span::raw(feed.title.clone()),
+                    Span::raw(feed.title.as_ref()),
                 ]))
             }
         });
