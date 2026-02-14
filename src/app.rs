@@ -121,11 +121,8 @@ impl App {
 
     /// Start downloading a single feed.
     fn start_download(&mut self, feed: FeedId) {
-        // Immediately mark the feed as being downloaded instead of waiting for
-        // the download task to tell us that the download has started.
-        // We do this so the `App::run()` loop can start ticking immediately.
+        // Mark the feed as queued up for download.
         self.feed_state.downloading.insert(feed.clone(), DownloadState::Queued);
-
 
         // Send the request to the downloader.
         let url = self.feed_state.get_feed(&feed).unwrap().url.clone();
