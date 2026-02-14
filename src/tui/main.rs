@@ -36,7 +36,7 @@ impl MainPage {
         // Go through each section.
         for (section_idx, section) in config.sections.iter().enumerate() {
             // The first line of the section is the section title.
-            rows.push(MainRow::SectionHeader(section.name.clone()));
+            rows.push(MainRow::SectionHeader(section.title.clone()));
 
             // Push the feeds into the section.
             for (feed_idx, _feed) in section.feeds.iter().enumerate() {
@@ -61,9 +61,9 @@ impl Page for MainPage {
                 ListItem::new("")
             }
 
-            MainRow::SectionHeader(name) => {
+            MainRow::SectionHeader(title) => {
                 ListItem::new(Line::styled(
-                    format!("────┤ {} ├────", name),
+                    format!("────┤ {} ├────", title),
                     Style::default()
                         .add_modifier(Modifier::BOLD)
                         .fg(Color::Magenta),
@@ -81,7 +81,7 @@ impl Page for MainPage {
                 let feed = state.get_feed(&feed_id).unwrap();
                 ListItem::new(Line::from(vec![
                     Span::raw(format!("   {}  ", spinner)),
-                    Span::raw(feed.name.clone()),
+                    Span::raw(feed.title.clone()),
                 ]))
             }
         });

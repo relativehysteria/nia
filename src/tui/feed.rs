@@ -45,12 +45,12 @@ impl Page for FeedPage {
                 Span::raw(format!("{:>5}", idx.to_string())),
                 Span::raw(post.published
                     .format("  ┊  %Y-%m-%d  │  ").to_string()),
-                Span::raw(post.name.as_str()),
+                Span::raw(post.title.as_str()),
             ]))
         });
 
         let section = state.get_section(self.feed_id.section_idx).unwrap();
-        let title = format!(" {} | {} ", section.name, feed.name);
+        let title = format!(" {} | {} ", section.title, feed.title);
         let list = crate::tui::build_list(&title, items);
 
         f.render_stateful_widget(list, f.area(), &mut self.list.state);

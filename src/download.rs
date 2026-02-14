@@ -182,7 +182,7 @@ fn extract_from_atom(feed: &AtomFeed) -> Vec<Post> {
     for entry in feed.entries() {
         // Set the metadata for this post.
         let id = entry.id.clone().into();
-        let name = entry.title.value.clone();
+        let title = entry.title.value.clone();
         let published = entry.updated.to_utc();
 
         // Parse the URLs from this post.
@@ -202,7 +202,7 @@ fn extract_from_atom(feed: &AtomFeed) -> Vec<Post> {
 
         // Save the post.
         let read = false;
-        posts.push(Post { urls, id, name, published, read });
+        posts.push(Post { urls, id, title, published, read });
     }
 
     posts
@@ -220,7 +220,7 @@ fn extract_from_rss(channel: &RssChannel) -> Vec<Post> {
         // Set the metadata for this post. Unlike Atom, RSS requires almost no
         // metadata for posts. If we don't have much to work with, we'll do it
         // ourselves.
-        let name = item.title.clone()
+        let title = item.title.clone()
             .or_else(|| item.description.as_ref()
                 .map(|d| truncate_chars(&d, 20)))
             .unwrap_or_else(|| "Untitled".to_string());
@@ -229,7 +229,7 @@ fn extract_from_rss(channel: &RssChannel) -> Vec<Post> {
             .map(|date| date.with_timezone(&chrono::Utc))
             .unwrap_or_else(|| chrono::Utc::now());
         let id = item.guid.as_ref().map(|g| g.value.clone())
-            .unwrap_or_else(|| hash(&format!("{:?} {:?}", published, name)))
+            .unwrap_or_else(|| hash(&format!("{:?} {:?}", published, title)))
             .into();
 
         // Parse the URLs from this post.
@@ -249,7 +249,7 @@ fn extract_from_rss(channel: &RssChannel) -> Vec<Post> {
 
         // Save the post.
         let read = false;
-        posts.push(Post { id, name, urls, published, read });
+        posts.push(Post { id, title, urls, published, read });
     }
 
     posts

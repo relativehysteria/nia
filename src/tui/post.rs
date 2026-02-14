@@ -50,8 +50,9 @@ impl Page for PostPage {
             ]))
         });
 
-        let section = &state.get_section(self.feed_id.section_idx).unwrap().name;
-        let title = format!(" {} | {} | {} ", section, feed.name, &post.name);
+        let section = &state.get_section(self.feed_id.section_idx)
+            .unwrap().title;
+        let title = format!(" {} | {} | {} ", section, feed.title, &post.title);
         let list = crate::tui::build_list(&title, items);
 
         f.render_stateful_widget(list, f.area(), &mut self.list.state);

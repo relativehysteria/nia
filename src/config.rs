@@ -16,7 +16,7 @@ pub struct FeedConfig {
 #[derive(Debug, Clone)]
 pub struct Section {
     /// Title of the section.
-    pub name: String,
+    pub title: String,
 
     /// A vector of the feeds in this section.
     pub feeds: Vec<Feed>,
@@ -26,7 +26,7 @@ pub struct Section {
 #[derive(Debug, Clone)]
 pub struct Feed {
     /// Title of this feed that will be shown in the TUI.
-    pub name: String,
+    pub title: String,
 
     /// The provided url of this feed.
     pub url: Url,
@@ -53,7 +53,7 @@ pub struct Post {
     pub id: PostId,
 
     /// Title of this post.
-    pub name: String,
+    pub title: String,
 
     /// The URLs present in this post.
     pub urls: Vec<Url>,
@@ -194,9 +194,9 @@ impl FeedConfig {
 
 impl Section {
     /// Create a new empty section.
-    fn new(name: String) -> Self {
+    fn new(title: String) -> Self {
         Section {
-            name,
+            title,
             feeds: Vec::new(),
         }
     }
@@ -210,10 +210,10 @@ impl Feed {
 
         // We expect `title | url`.
         if parts.len() == 2 {
-            let name = parts[0].to_string();
+            let title = parts[0].to_string();
             let url = Url::parse(parts[1])
                 .expect("Invalid URL specified for feed");
-            Ok(Feed { name, url, posts: Vec::new() })
+            Ok(Feed { title, url, posts: Vec::new() })
         } else {
             Err(io::Error::new(io::ErrorKind::Other,
                 "Invalid line. Expected \"<title> | <url>\""))
