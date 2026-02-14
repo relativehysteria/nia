@@ -40,7 +40,7 @@ impl Page for FeedPage {
             self.list = ListPage::new((0..feed.posts.len()).collect());
         }
 
-        let items = feed.posts.iter().enumerate().map(|(idx, post)| {
+        let items = feed.posts.as_ref().iter().enumerate().map(|(idx, post)| {
             ListItem::new(Line::from(vec![
                 Span::raw(format!("{:>5}", idx.to_string())),
                 Span::raw(post.published
@@ -60,13 +60,19 @@ impl Page for FeedPage {
         &mut self.list
     }
 
-    fn on_key(&mut self, key: KeyCode, _state: &FeedState) -> PageAction {
+    fn on_key(&mut self, key: KeyCode, state: &FeedState) -> PageAction {
         match key {
             // Check the post page of the selected post.
             KeyCode::Enter | KeyCode::Char('l') => {
                 if let Some(&selected) = self.list.selected_item() {
-                    PageAction::NewPage(Box::new(
-                            PostPage::new(self.feed_id.clone(), selected)))
+                    let feed = state.get_feed(&self.feed_id).unwrap();
+                    let post = &feed.posts.as_ref()[selected];
+
+                    let feed_id = self.feed_id.clone();
+                    let post_id = post.id.clone();
+
+                    let page = Box::new(PostPage::new(feed_id, post_id));
+                    PageAction::NewPage(page)
                 } else {
                     PageAction::None
                 }

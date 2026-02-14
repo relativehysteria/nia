@@ -32,12 +32,50 @@ pub struct Feed {
     pub url: Url,
 
     /// The posts in the feed.
-    pub posts: Vec<Post>,
+    pub posts: Posts,
 }
 
-/// A post identifier
+/// A vector of posts sorted by their published date.
 #[repr(transparent)]
-#[derive(Eq, PartialEq, Debug, Clone)]
+#[derive(Debug, Clone)]
+pub struct Posts(Vec<Post>);
+
+impl Posts {
+    /// Create a new post vector.
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    /// Insert a new post into the vector.
+    pub fn insert(&mut self, post: Post) {
+        let idx = self.0.binary_search(&post).unwrap_or_else(|p| p);
+        self.0.insert(idx, post);
+    }
+
+    /// Check if the vector contains `post` already.
+    pub fn contains(&self, post: &Post) -> bool {
+        self.0.binary_search(&post).is_ok()
+    }
+
+    /// Get the length of the posts vector.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Get a reference to post given its ID.
+    pub fn get_by_id(&self, id: &PostId) -> Option<&Post> {
+        self.0.iter().find(|p| &p.id == id)
+    }
+
+    /// Get a reference to the inner vector.
+    pub fn as_ref(&self) -> &[Post] {
+        &self.0
+    }
+}
+
+/// A post identifier.
+#[repr(transparent)]
+#[derive(Eq, PartialEq, Debug, Clone, Hash)]
 pub struct PostId(pub String);
 
 impl From<String> for PostId {
@@ -99,7 +137,7 @@ impl FeedConfig {
     /// Parse a config from any buffered reader.
     pub fn parse_reader<R: BufRead>(reader: R) -> io::Result<Self> {
         // Read the sections.
-        let mut sections = Vec::new();
+        let mut sections: Vec<Section> = Vec::new();
         let mut current_section: Option<Section> = None;
 
         for line in reader.lines() {
@@ -119,8 +157,8 @@ impl FeedConfig {
                 }
 
                 // Create a new section.
-                let name = line.trim_start_matches('#').trim().to_string();
-                current_section = Some(Section::new(name))
+                let title = line.trim_start_matches('#').trim().to_string();
+                current_section = Some(Section::new(title))
             } else if let Some(section) = &mut current_section {
                 // It's a feed line in the current section.
                 section.feeds.push(Feed::parse(line)?);
@@ -213,7 +251,7 @@ impl Feed {
             let title = parts[0].to_string();
             let url = Url::parse(parts[1])
                 .expect("Invalid URL specified for feed");
-            Ok(Feed { title, url, posts: Vec::new() })
+            Ok(Feed { title, url, posts: Posts::new() })
         } else {
             Err(io::Error::new(io::ErrorKind::Other,
                 "Invalid line. Expected \"<title> | <url>\""))

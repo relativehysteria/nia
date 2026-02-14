@@ -4,7 +4,7 @@ use ratatui::{
 };
 use crate::tui::{Page, NavigableList, ListPage};
 use crate::app::FeedState;
-use crate::config::FeedId;
+use crate::config::{FeedId, PostId};
 
 impl crate::tui::Selectable for url::Url {
     fn selectable(&self) -> bool {
@@ -17,8 +17,8 @@ pub struct PostPage {
     /// The identifier of this post's feed.
     feed_id: FeedId,
 
-    /// The index of this post within the feed.
-    post_idx: usize,
+    /// The identifier of this post.
+    post_id: PostId,
 
     /// List of rows on the post page.
     ///
@@ -27,8 +27,8 @@ pub struct PostPage {
 }
 
 impl PostPage {
-    pub fn new(feed_id: FeedId, post_idx: usize) -> Self {
-        Self { feed_id, post_idx, list: ListPage::new(Vec::new()) }
+    pub fn new(feed_id: FeedId, post_id: PostId) -> Self {
+        Self { feed_id, post_id, list: ListPage::new(Vec::new()) }
     }
 }
 
@@ -36,7 +36,7 @@ impl Page for PostPage {
     fn draw(&mut self, f: &mut Frame, state: &FeedState) {
         // Get this post state.
         let feed = state.get_feed(&self.feed_id).unwrap();
-        let post = &feed.posts[self.post_idx];
+        let post = feed.posts.get_by_id(&self.post_id).unwrap();
 
         // Rebuild the URL list if the lengths differ.
         if self.list.items.len() != post.urls.len() {
