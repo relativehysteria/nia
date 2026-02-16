@@ -98,13 +98,14 @@ pub struct App {
 
 impl App {
     /// Create a new application state given the `config`.
-    pub fn new(feeds: FeedConfig) -> Self {
-        Self {
-            pages: vec![Box::new(main::MainPage::new(&feeds))],
-            feed_state: FeedState::new(feeds),
-            download: DownloadChannel::spawn_downloader_thread(),
-            database: DatabaseChannel::spawn_database_thread(),
-        }
+    pub fn new(mut feeds: FeedConfig) -> Self {
+        let download = DownloadChannel::spawn_downloader_thread();
+        let database = DatabaseChannel::spawn_database_thread(
+            "/tmp/nia_test", &mut feeds);
+        let pages = vec![Box::new(main::MainPage::new(&feeds)) as Box<dyn Page>];
+        let feed_state = FeedState::new(feeds);
+
+        Self { download, database, pages, feed_state, }
     }
 
     /// Go back from the currently shown page to the one before.
@@ -183,17 +184,22 @@ impl App {
                 },
                 DownloadResponse::Finished { feed, posts } => {
                     // Retain only new posts.
-                    let new_posts = posts.into_iter()
+                    let posts = posts.into_iter()
                         .filter(|p| !self.feed_state.contains_post(&feed, p))
                         .collect::<Vec<Post>>();
 
                     // Save them in the feed.
-                    self.feed_state.insert_posts(&feed, &new_posts);
+                    self.feed_state.insert_posts(&feed, &posts);
 
                     // Save them in the database.
+                    let feed_url = self.feed_state.get_feed(&feed)
+                        .unwrap()
+                        .url
+                        .as_str()
+                        .into();
+
                     self.database.request_tx.send(DatabaseRequest::SavePosts {
-                        feed: feed.clone(),
-                        posts: new_posts,
+                        feed_url, posts
                     }).expect("The database channel closed abruptly.");
 
                     // Remove the feed's downloading status.

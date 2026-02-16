@@ -45,7 +45,7 @@ impl Page for FeedPage {
                 Span::raw(format!("{:>5}", idx.to_string())),
                 Span::raw(post.published
                     .format("  ┊  %Y-%m-%d  │  ").to_string()),
-                Span::raw(post.title.as_str()),
+                Span::raw(post.title.as_ref()),
             ]))
         });
 

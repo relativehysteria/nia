@@ -5,6 +5,7 @@ use std::io::{self, BufRead};
 use std::path::PathBuf;
 use url::Url;
 use chrono::{DateTime, Utc};
+use serde::{Serialize, Deserialize};
 
 /// A parsed config file.
 #[derive(Debug, Clone)]
@@ -36,17 +37,17 @@ pub struct Feed {
     pub posts: Posts,
 }
 
-impl Feed {
-    /// Generate a stable identifier for this feed.
-    pub fn id(&self) -> Arc<str> {
-        crate::hash(self.url.as_str()).into()
-    }
-}
-
 /// A vector of posts sorted by their published date.
 #[repr(transparent)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Posts(Vec<Post>);
+
+impl From<Vec<Post>> for Posts {
+    fn from(mut v: Vec<Post>) -> Self {
+        v.sort_unstable_by(|a, b| a.published.cmp(&b.published));
+        Self(v)
+    }
+}
 
 impl Posts {
     /// Create a new post vector.
@@ -84,8 +85,11 @@ impl Posts {
 
 /// A post identifier.
 #[repr(transparent)]
-#[derive(Eq, PartialEq, Debug, Clone, Hash)]
-pub struct PostId(pub Arc<str>);
+#[derive(Eq, PartialEq, Debug, Clone, Hash, Serialize, Deserialize)]
+pub struct PostId(
+    #[serde(with = "arc_str_serde")]
+    pub Arc<str>
+);
 
 impl From<String> for PostId {
     fn from(s: String) -> Self {
@@ -94,18 +98,21 @@ impl From<String> for PostId {
 }
 
 /// A single post in a feed.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Post {
     /// Identifier of the post.
     pub id: PostId,
 
     /// Title of this post.
-    pub title: Arc<String>,
+    #[serde(with = "arc_str_serde")]
+    pub title: Arc<str>,
 
     /// The URLs present in this post.
+    #[serde(with = "vec_url_serde")]
     pub urls: Vec<Url>,
 
     /// Time when the feed was published (for RSS) or updated (for Atom).
+    #[serde(with = "datetime_serde")]
     pub published: DateTime<Utc>,
 
     /// Whether this post has been read or not.
@@ -340,5 +347,89 @@ not a feed
     fn empty_input_produces_no_sections() {
         let config = parse_str("").unwrap();
         assert!(config.sections.is_empty());
+    }
+}
+
+mod arc_str_serde {
+    use serde::{Serializer, Deserializer, Deserialize, Serialize};
+    use std::sync::Arc;
+
+    pub fn serialize<S>(arc: &Arc<str>, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer
+    {
+        serializer.serialize_str(arc.as_ref())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Arc<str>, D::Error>
+    where D: Deserializer<'de>
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(Arc::from(s))
+    }
+}
+
+mod url_serde {
+    use serde::{Serializer, Deserializer, Deserialize, Serialize};
+    use url::Url;
+
+    pub fn serialize<S>(url: &Url, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer
+    {
+        serializer.serialize_str(url.as_str())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Url, D::Error>
+    where
+        D: Deserializer<'de>
+    {
+        let s = String::deserialize(deserializer)?;
+        Url::parse(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+mod vec_url_serde {
+    use serde::{Serializer, Deserializer, Deserialize, Serialize};
+    use url::Url;
+
+    pub fn serialize<S>(urls: &Vec<Url>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer
+    {
+        // Convert each Url to &str and serialize as Vec<&str>
+        let strings: Vec<&str> = urls.iter().map(|u| u.as_str()).collect();
+        strings.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Url>, D::Error>
+    where
+        D: Deserializer<'de>
+    {
+        let strings: Vec<String> = Vec::deserialize(deserializer)?;
+        strings
+            .into_iter()
+            .map(|s| Url::parse(&s).map_err(serde::de::Error::custom))
+            .collect()
+    }
+}
+
+mod datetime_serde {
+    use serde::{Serializer, Deserializer, Deserialize, Serialize};
+    use chrono::{DateTime, Utc, TimeZone};
+
+    pub fn serialize<S>(dt: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer
+    {
+        // store as i64 seconds since epoch
+        serializer.serialize_i64(dt.timestamp())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+    where
+        D: Deserializer<'de>
+    {
+        let ts = i64::deserialize(deserializer)?;
+        Ok(Utc.timestamp(ts, 0))
     }
 }
