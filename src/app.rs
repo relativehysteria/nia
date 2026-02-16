@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::prelude::*;
 use crate::tui::{main, Page, PageAction, Spinner};
-use crate::config::{Section, Feed, FeedId, FeedConfig, Post};
+use crate::config::{Section, Feed, FeedId, FeedConfig, Post, Posts};
 use crate::download::*;
 use crate::database::*;
 
@@ -72,9 +72,9 @@ impl FeedState {
     }
 
     /// Insert new `posts` into `feed`.
-    pub fn insert_posts(&mut self, feed: &FeedId, posts: &[Post]) {
+    pub fn insert_posts(&mut self, feed: &FeedId, posts: Posts) {
         let feed = self.get_feed_mut(feed).unwrap();
-        posts.iter().cloned().for_each(|post| feed.posts.insert(post));
+        feed.posts = posts;
     }
 }
 
@@ -182,14 +182,12 @@ impl App {
                 DownloadResponse::Failed(feed) => {
                     self.feed_state.downloading.remove(&feed);
                 },
-                DownloadResponse::Finished { feed, posts } => {
+                DownloadResponse::Finished { feed, mut posts } => {
                     // Retain only new posts.
-                    let posts = posts.into_iter()
-                        .filter(|p| !self.feed_state.contains_post(&feed, p))
-                        .collect::<Vec<Post>>();
+                    posts.retain(|p| !self.feed_state.contains_post(&feed, p));
 
                     // Save them in the feed.
-                    self.feed_state.insert_posts(&feed, &posts);
+                    self.feed_state.insert_posts(&feed, posts.clone());
 
                     // Save them in the database.
                     let feed_url = self.feed_state.get_feed(&feed)

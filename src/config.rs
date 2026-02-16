@@ -44,7 +44,7 @@ pub struct Posts(Vec<Post>);
 
 impl From<Vec<Post>> for Posts {
     fn from(mut v: Vec<Post>) -> Self {
-        v.sort_unstable_by(|a, b| a.published.cmp(&b.published));
+        v.sort_unstable_by(|a, b| a.published.cmp(&b.published).reverse());
         Self(v)
     }
 }
@@ -53,6 +53,14 @@ impl Posts {
     /// Create a new post vector.
     pub fn new() -> Self {
         Self(Vec::new())
+    }
+
+    /// only retain elements specified by the predicate.
+    pub fn retain<F>(&mut self, f: F)
+    where
+        F: FnMut(&Post) -> bool
+    {
+        self.0.retain(f)
     }
 
     /// Insert a new post into the vector.

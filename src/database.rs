@@ -2,14 +2,14 @@ use std::sync::mpsc;
 use std::path::Path;
 use std::thread;
 use std::sync::Arc;
-use crate::config::{Post, FeedConfig};
+use crate::config::{Post, FeedConfig, Posts};
 
 /// A database request from the application to the database.
 pub enum DatabaseRequest {
     /// Save the specified posts into database.
     SavePosts {
         feed_url: Arc<str>,
-        posts: Vec<Post>
+        posts: Posts,
     },
 }
 
@@ -101,10 +101,10 @@ impl Database {
     }
 
     /// Save posts to the database.
-    pub fn save_posts(&self, feed_url: &str, posts: Vec<Post>) {
+    pub fn save_posts(&self, feed_url: &str, posts: Posts) {
         let tree = self.posts_tree();
 
-        for post in posts {
+        for post in posts.as_ref().iter() {
             let key = Self::make_key(feed_url, &post);
             let value = postcard::to_stdvec(&post)
                 .expect("Failed to serialize post");
@@ -115,13 +115,14 @@ impl Database {
     }
 
     /// Load all posts for a feed.
-    pub fn load_feed(&self, feed_url: &str) -> Vec<Post> {
+    pub fn load_feed(&self, feed_url: &str) -> Posts {
         let tree = self.posts_tree();
         let prefix = Self::feed_prefix(feed_url);
 
         tree.scan_prefix(prefix)
             .filter_map(|res| res.ok())
             .filter_map(|(_, v)| postcard::from_bytes::<Post>(&v).ok())
-            .collect()
+            .collect::<Vec<Post>>()
+            .into()
     }
 }

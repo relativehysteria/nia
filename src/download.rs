@@ -3,7 +3,7 @@ use std::sync::mpsc;
 use atom_syndication::Feed as AtomFeed;
 use rss::Channel as RssChannel;
 use url::Url;
-use crate::config::{FeedId, FeedConfig, Post};
+use crate::config::{FeedId, FeedConfig, Post, Posts};
 use crate::hash;
 
 /// A map of sections to feeds to URLs.
@@ -54,7 +54,7 @@ pub enum DownloadResponse {
     /// The downloader has finished downloading a feed.
     Finished {
         feed: FeedId,
-        posts: Vec<Post>,
+        posts: Posts,
     },
 }
 
@@ -132,16 +132,13 @@ fn spawn_feed_downloader(
             };
 
             // Extract the urls.
-            let mut posts = if let Ok(atom) = body.parse::<AtomFeed>() {
+            let posts = if let Ok(atom) = body.parse::<AtomFeed>() {
                 extract_from_atom(&atom)
             } else if let Ok(rss) = body.parse::<RssChannel>() {
                 extract_from_rss(&rss)
             } else {
-                Vec::new()
+                Posts::new()
             };
-
-            // Sort the posts by date.
-            posts.sort_unstable_by(|a, b| a.published.cmp(&b.published));
 
             // Tell the app we have finished the download.
             let _ = response_tx
@@ -176,7 +173,7 @@ fn extract_urls_from_text(acc: &mut Vec<Url>, s: &str) {
 ///
 /// All of the posts will be marked as unread. It is up to the application to
 /// make sure that before read posts are marked as such.
-fn extract_from_atom(feed: &AtomFeed) -> Vec<Post> {
+fn extract_from_atom(feed: &AtomFeed) -> Posts {
     let mut posts = Vec::new();
 
     // Go through each post.
@@ -206,14 +203,14 @@ fn extract_from_atom(feed: &AtomFeed) -> Vec<Post> {
         posts.push(Post { urls, id, title, published, read });
     }
 
-    posts
+    posts.into()
 }
 
 /// Extract the posts from an RSS feed.
 ///
 /// All of the posts will be marked as unread. It is up to the application to
 /// make sure that before read posts are marked as such.
-fn extract_from_rss(channel: &RssChannel) -> Vec<Post> {
+fn extract_from_rss(channel: &RssChannel) -> Posts {
     let mut posts = Vec::new();
 
     // Go through each post.
@@ -254,7 +251,7 @@ fn extract_from_rss(channel: &RssChannel) -> Vec<Post> {
         posts.push(Post { id, title, urls, published, read });
     }
 
-    posts
+    posts.into()
 }
 
 // Utility function to truncate a string to at most `n` characters safely.
