@@ -351,7 +351,7 @@ not a feed
 }
 
 mod arc_str_serde {
-    use serde::{Serializer, Deserializer, Deserialize, Serialize};
+    use serde::{Serializer, Deserializer, Deserialize};
     use std::sync::Arc;
 
     pub fn serialize<S>(arc: &Arc<str>, serializer: S) -> Result<S::Ok, S::Error>
@@ -365,26 +365,6 @@ mod arc_str_serde {
     {
         let s = String::deserialize(deserializer)?;
         Ok(Arc::from(s))
-    }
-}
-
-mod url_serde {
-    use serde::{Serializer, Deserializer, Deserialize, Serialize};
-    use url::Url;
-
-    pub fn serialize<S>(url: &Url, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer
-    {
-        serializer.serialize_str(url.as_str())
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Url, D::Error>
-    where
-        D: Deserializer<'de>
-    {
-        let s = String::deserialize(deserializer)?;
-        Url::parse(&s).map_err(serde::de::Error::custom)
     }
 }
 
@@ -414,7 +394,7 @@ mod vec_url_serde {
 }
 
 mod datetime_serde {
-    use serde::{Serializer, Deserializer, Deserialize, Serialize};
+    use serde::{Serializer, Deserializer, Deserialize};
     use chrono::{DateTime, Utc, TimeZone};
 
     pub fn serialize<S>(dt: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
@@ -430,6 +410,6 @@ mod datetime_serde {
         D: Deserializer<'de>
     {
         let ts = i64::deserialize(deserializer)?;
-        Ok(Utc.timestamp(ts, 0))
+        Ok(Utc.timestamp_opt(ts, 0).unwrap())
     }
 }

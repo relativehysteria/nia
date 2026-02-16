@@ -1,9 +1,8 @@
-use std::collections::{HashMap, HashSet};
 use std::sync::mpsc;
 use std::path::Path;
 use std::thread;
 use std::sync::Arc;
-use crate::config::{FeedId, Post, FeedConfig, Posts};
+use crate::config::{Post, FeedConfig};
 
 /// A database request from the application to the database.
 pub enum DatabaseRequest {
