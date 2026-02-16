@@ -4,7 +4,6 @@ use std::path::Path;
 use std::thread;
 use crate::config::{FeedId, Post};
 
-
 /// A database request from the application to the database.
 pub enum DatabaseRequest {
     /// Save the specified posts into database.
@@ -13,24 +12,15 @@ pub enum DatabaseRequest {
         posts: Vec<Post>
     },
 
-    /// Load all post metadata for a feed.
+    /// Load all posts for a feed.
     LoadFeed {
         feed: FeedId
-    },
-
-    /// Mark a post as read or unread.
-    MarkRead {
-        read: bool,
-        feed: FeedId,
-        post_idx: usize,
     },
 }
 
 /// A database response to the application.
 pub enum DatabaseResponse {
-    /// Post metadata loaded.
-    ///
-    /// Unread posts will also have their contents loaded.
+    /// Posts loaded for a feed.
     FeedLoaded {
         feed: FeedId,
         posts: Vec<Post>,
@@ -55,28 +45,16 @@ impl DatabaseChannel {
         let (request_tx, request_rx) = mpsc::channel::<DatabaseRequest>();
         let (response_tx, response_rx) = mpsc::channel::<DatabaseResponse>();
 
+        // Spawn the database.
+        let db = Database::new("/tmp/nia_test");
+
         // Spawn the database thread.
         thread::spawn(move || {
-            // // Tracks unread posts: FeedId -> indices of unread posts
-            // let mut unread_index: HashMap<FeedId, HashSet<usize>> =
-            //     HashMap::new();
-
-            // // On startup, try to load existing unread indices
-            // let unread = data_dir.join("unread.json");
-            // if unread.exists() {
-            //     let file = fs::File::open(unread)
-            //         .expect("Couldn't open the post read index.");
-            //     unread_index = serde_json::from_reader(file)
-            //         .unwrap_or_default();
-            // }
-
             while let Ok(request) = request_rx.recv() {
                 match request {
                     DatabaseRequest::SavePosts { feed, posts } => {
                     },
                     DatabaseRequest::LoadFeed { feed } => {
-                    },
-                    DatabaseRequest::MarkRead { read, feed, post_idx } => {
                     },
                 }
             }
@@ -87,8 +65,16 @@ impl DatabaseChannel {
     }
 }
 
-/// The database state.
-struct Database<P: AsRef<Path>> {
-    /// Directory where the data will be stored.
-    data_dir: P,
+/// Implementation of the database.
+struct Database {
+    /// The internal sled database state.
+    db: sled::Db,
+}
+
+impl Database {
+    /// Create a new database.
+    fn new<P: AsRef<Path>>(data_dir: P) -> Self {
+        let db = sled::open(data_dir).expect("failed to open sled db");
+        Self { db }
+    }
 }

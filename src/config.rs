@@ -36,6 +36,13 @@ pub struct Feed {
     pub posts: Posts,
 }
 
+impl Feed {
+    /// Generate a stable identifier for this feed.
+    pub fn id(&self) -> Arc<str> {
+        crate::hash(self.url.as_str()).into()
+    }
+}
+
 /// A vector of posts sorted by their published date.
 #[repr(transparent)]
 #[derive(Debug, Clone)]
