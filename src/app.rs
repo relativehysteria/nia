@@ -74,7 +74,7 @@ impl FeedState {
     /// Insert new `posts` into `feed`.
     pub fn insert_posts(&mut self, feed: &FeedId, posts: Posts) {
         let feed = self.get_feed_mut(feed).unwrap();
-        feed.posts = posts;
+        feed.posts.append(posts);
     }
 }
 

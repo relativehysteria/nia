@@ -55,6 +55,11 @@ impl Posts {
         Self(Vec::new())
     }
 
+    /// Append posts from `other` to this vector.
+    pub fn append(&mut self, other: Posts) {
+        other.0.into_iter().for_each(|post| self.insert(post));
+    }
+
     /// only retain elements specified by the predicate.
     pub fn retain<F>(&mut self, f: F)
     where
