@@ -146,7 +146,7 @@ impl Database {
             let value = postcard::to_stdvec(&post)
                 .expect("Failed to serialize post");
 
-            tree.compare_and_swap(
+            let _ = tree.compare_and_swap(
                 key,
                 None as Option<&[u8]>,
                 Some(value),
