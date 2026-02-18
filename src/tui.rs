@@ -9,7 +9,7 @@ use ratatui::{
 };
 use crossterm::event::KeyCode;
 use crate::app::FeedState;
-use crate::config::FeedId;
+use crate::config::{FeedId, PostId};
 use crate::database::DatabaseChannel;
 
 /// Trait which must be implemented for all entries in a navigable list that are
@@ -68,6 +68,12 @@ pub enum PageAction {
 
     /// Download all feeds.
     DownloadAllFeeds,
+
+    /// Mark all posts within the feed as read.
+    MarkFeedRead(FeedId),
+
+    /// Toggle the read status for the post.
+    TogglePostRead(FeedId, PostId),
 }
 
 /// A page that lists out selectable `T` elements.

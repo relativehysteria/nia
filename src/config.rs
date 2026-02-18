@@ -99,6 +99,11 @@ impl Posts {
     pub fn as_ref(&self) -> &[Post] {
         &self.0
     }
+
+    /// Get a mutable reference to the inner vector.
+    pub fn as_ref_mut(&mut self) -> &mut [Post] {
+        &mut self.0
+    }
 }
 
 /// A post identifier.

@@ -194,6 +194,50 @@ impl App {
             PageAction::NewPage(p)            => self.new_page(p),
             PageAction::DownloadFeed(feed_id) => self.start_download(feed_id),
             PageAction::DownloadAllFeeds      => self.download_all(),
+
+            PageAction::MarkFeedRead(feed_id) => {
+                // Crate the vector that will be saved in the database.
+                let mut posts = Posts::new();
+
+                // Go through each post in the feed and mark it as read.
+                let feed = self.feed_state.get_feed_mut(&feed_id).unwrap();
+                for post in feed.posts.as_ref_mut().iter_mut() {
+                    // Skip read posts.
+                    if post.read {
+                        continue;
+                    }
+
+                    // Mark the post as read.
+                    post.read = true;
+
+                    // Insert it into our tracking vector.
+                    posts.insert(post.clone());
+                }
+
+                // Save the unread posts in our database.
+                let feed_url = feed.url.as_str().into();
+                self.database.request_tx.send(DatabaseRequest::SavePosts {
+                    feed_url, posts
+                }).expect("Database channel closed abruptly");
+            },
+
+            PageAction::TogglePostRead(feed_id, post_id) => {
+                // Create the vector for the post that will be saved in the
+                // database.
+                let mut posts = Posts::new();
+
+                // Get the post and toggle its read state.
+                let feed = self.feed_state.get_feed_mut(&feed_id).unwrap();
+                let post = feed.posts.get_by_id_mut(&post_id).unwrap();
+                post.read = !post.read;
+
+                // Save the post in our database.
+                posts.insert(post.clone());
+                let feed_url = feed.url.as_str().into();
+                self.database.request_tx.send(DatabaseRequest::SavePosts {
+                    feed_url, posts
+                }).expect("Database channel closed abruptly");
+            },
         }
 
         false

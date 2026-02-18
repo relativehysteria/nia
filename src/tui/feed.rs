@@ -69,21 +69,29 @@ impl Page for FeedPage {
     }
 
     fn on_key(&mut self, key: KeyCode, state: &FeedState) -> PageAction {
+        let Some(&selected) = self.list.selected_item() else {
+            return PageAction::None;
+        };
+
         match key {
+            // Toggle the read status on the post.
+            KeyCode::Char('r') => {
+                let feed = state.get_feed(&self.feed_id).unwrap();
+                let post = &feed.posts.as_ref()[selected];
+                let post_id = post.id.clone();
+                PageAction::TogglePostRead(self.feed_id.clone(), post_id)
+            }
+
             // Check the post page of the selected post.
             KeyCode::Enter | KeyCode::Char('l') => {
-                if let Some(&selected) = self.list.selected_item() {
-                    let feed = state.get_feed(&self.feed_id).unwrap();
-                    let post = &feed.posts.as_ref()[selected];
+                let feed = state.get_feed(&self.feed_id).unwrap();
+                let post = &feed.posts.as_ref()[selected];
 
-                    let feed_id = self.feed_id.clone();
-                    let post_id = post.id.clone();
+                let feed_id = self.feed_id.clone();
+                let post_id = post.id.clone();
 
-                    let page = Box::new(PostPage::new(feed_id, post_id));
-                    PageAction::NewPage(page)
-                } else {
-                    PageAction::None
-                }
+                let page = Box::new(PostPage::new(feed_id, post_id));
+                PageAction::NewPage(page)
             }
             _ => PageAction::None,
         }

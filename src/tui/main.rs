@@ -115,6 +115,11 @@ impl Page for MainPage {
                 PageAction::DownloadAllFeeds
             },
 
+            // Mark all posts in the feed as read.
+            KeyCode::Char('r') => {
+                PageAction::MarkFeedRead(feed_id.clone())
+            },
+
             // Check the posts listing for the selected feed.
             KeyCode::Enter | KeyCode::Char('l') => {
                 // Don't do anything if the feed is empty.
