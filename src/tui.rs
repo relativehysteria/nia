@@ -190,8 +190,7 @@ where
         )
         .highlight_style(
             Style::default()
-                .add_modifier(Modifier::ITALIC)
-                .add_modifier(Modifier::BOLD)
+                .fg(Color::Blue)
         )
         .highlight_symbol(" ")
         .scroll_padding(4)
