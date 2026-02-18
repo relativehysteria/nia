@@ -41,12 +41,20 @@ impl Page for FeedPage {
         }
 
         let items = feed.posts.as_ref().iter().enumerate().map(|(idx, post)| {
-            ListItem::new(Line::from(vec![
+            let line = Line::from(vec![
                 Span::raw(format!("{:>5}", idx.to_string())),
                 Span::raw(post.published
                     .format("  ┊  %Y-%m-%d  │  ").to_string()),
                 Span::raw(post.title.as_ref()),
-            ]))
+            ]);
+
+            let line = if !post.read {
+                line.style(Style::default().add_modifier(Modifier::BOLD))
+            } else {
+                line
+            };
+
+            ListItem::new(line)
         });
 
         let section = state.get_section(self.feed_id.section_idx).unwrap();
