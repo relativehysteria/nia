@@ -221,11 +221,11 @@ impl FeedConfig {
         let config_dir = match std::env::var("XDG_CONFIG_HOME") {
             Ok(dir) => PathBuf::new().join(dir),
             Err(_) => std::env::home_dir()
-                .expect("Couldn't get home directory.")
+                .expect("Couldn't get home directory")
                 .join(".config")
         };
 
-        // Use the compile time project name as the config dir!
+        // Use the compile time project name as the config dir.
         let config_dir = config_dir.join(env!("CARGO_PKG_NAME"));
 
         // If the directory doesn't exist, create it.
@@ -245,6 +245,7 @@ impl FeedConfig {
         let config_dir = Self::get_config_dir()?;
         let config_file = config_dir.join("feeds");
 
+        // Make sure it's a file.
         config_file.metadata()
             .map(|metadata| {
                 if metadata.is_file() {

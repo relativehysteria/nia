@@ -100,8 +100,7 @@ impl App {
     /// Create a new application state given the `config`.
     pub fn new(mut feeds: FeedConfig) -> Self {
         let download = DownloadChannel::spawn_downloader_thread();
-        let database = DatabaseChannel::spawn_database_thread(
-            "/tmp/nia_test", &mut feeds);
+        let database = DatabaseChannel::spawn_database_thread(&mut feeds);
         let pages = vec![Box::new(main::MainPage::new(&feeds)) as Box<dyn Page>];
         let feed_state = FeedState::new(feeds);
 

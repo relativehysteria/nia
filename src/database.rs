@@ -1,7 +1,8 @@
 use std::sync::mpsc;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::thread;
 use std::sync::Arc;
+use std::io;
 use crate::config::{Post, FeedConfig, Posts};
 
 /// A database request from the application to the database.
@@ -23,15 +24,12 @@ pub struct DatabaseChannel {
 impl DatabaseChannel {
     /// Spawn the background database thread that will handle all permanent
     /// feed storage accesses.
-    pub fn spawn_database_thread<P: AsRef<Path>>(
-        data_dir: P,
-        cfg: &mut FeedConfig
-    ) -> Self {
+    pub fn spawn_database_thread(cfg: &mut FeedConfig) -> Self {
         // Spawn the channels for the database requests and responses.
         let (request_tx, request_rx) = mpsc::channel::<DatabaseRequest>();
 
         // Spawn the database.
-        let db = Database::new(data_dir);
+        let db = Database::with_default_data_dir();
 
         // Load all posts into the feed config.
         for section in &mut cfg.sections {
@@ -69,6 +67,45 @@ impl Database {
     fn new<P: AsRef<Path>>(data_dir: P) -> Self {
         let db = sled::open(data_dir).expect("Failed to open sled db");
         Self { db }
+    }
+
+    /// Get path to the data directory.
+    fn get_data_dir() -> io::Result<PathBuf> {
+        // Get a path to the data directory.
+        let data_dir = match std::env::var("XDG_DATA_HOME") {
+            Ok(dir) => PathBuf::new().join(dir),
+            Err(_) => std::env::home_dir()
+                .expect("Couldn't get home directory")
+                .join(".local/share")
+        };
+
+        // Use the compile time project name as the config dir.
+        let data_dir = data_dir.join(env!("CARGO_PKG_NAME"));
+
+        // If the directory doesn't exist, create it.
+        if !data_dir.exists() {
+            std::fs::DirBuilder::new().recursive(true).create(&data_dir)?;
+        }
+
+        // Make sure it's a directory.
+        data_dir.metadata()
+            .map(|metadata| {
+                if metadata.is_dir() {
+                    Ok(data_dir)
+                } else {
+                    let err = format!("Path exists but isn't a directory: {}",
+                        data_dir.display());
+                    Err(io::Error::new(io::ErrorKind::Other, err))
+                }
+            })
+        .flatten()
+    }
+
+    /// Create a new database using the default database directory.
+    fn with_default_data_dir() -> Self {
+        // Get path to the data dir.
+        let data_dir = Self::get_data_dir().expect("Couldn't get data dir");
+        Self::new(data_dir)
     }
 
     /// Open (or create) the "posts" tree.
