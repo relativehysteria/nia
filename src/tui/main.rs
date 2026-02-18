@@ -96,7 +96,7 @@ impl Page for MainPage {
     }
 
     fn on_key(&mut self, key: KeyCode, state: &FeedState) -> PageAction {
-        let Some(selected) = self.list.selected_item() else {
+        let Some(MainRow::Feed(feed_id)) = self.list.selected_item() else {
             return PageAction::None;
         };
 
@@ -107,11 +107,7 @@ impl Page for MainPage {
 
             // Download the currently selected feed.
             KeyCode::Char('h') => {
-                if let MainRow::Feed(feed_id) = selected {
-                    PageAction::DownloadFeed(feed_id.clone())
-                } else {
-                    PageAction::None
-                }
+                PageAction::DownloadFeed(feed_id.clone())
             },
 
             // Download all feeds.
@@ -121,18 +117,13 @@ impl Page for MainPage {
 
             // Check the posts listing for the selected feed.
             KeyCode::Enter | KeyCode::Char('l') => {
-                if let MainRow::Feed(feed_id) = selected {
-                    // Don't do anything if the feed is empty.
-                    let feed = state.get_feed(feed_id).unwrap();
-                    if feed.posts.len() == 0 {
-                        PageAction::None
-                    } else {
-                        PageAction::NewPage(
-                            Box::new(FeedPage::new(feed_id.clone())))
-                    }
-
-                } else {
+                // Don't do anything if the feed is empty.
+                let feed = state.get_feed(feed_id).unwrap();
+                if feed.posts.len() == 0 {
                     PageAction::None
+                } else {
+                    PageAction::NewPage(
+                        Box::new(FeedPage::new(feed_id.clone())))
                 }
             },
 

@@ -10,6 +10,7 @@ use ratatui::{
 use crossterm::event::KeyCode;
 use crate::app::FeedState;
 use crate::config::FeedId;
+use crate::database::DatabaseChannel;
 
 /// Trait which must be implemented for all entries in a navigable list that are
 /// selectable.
@@ -35,7 +36,7 @@ pub trait Page {
     /// A hook that is executed by the app when the page is created and pushed
     /// to the page stack.
     #[allow(unused_variables)]
-    fn on_new(&mut self, state: &mut FeedState) {}
+    fn on_new(&mut self, state: &mut FeedState, database: &DatabaseChannel) {}
 }
 
 /// Navigation controls for selectable lists.

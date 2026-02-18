@@ -208,7 +208,7 @@ impl App {
 
     /// Go from the current page to a new page.
     fn new_page(&mut self, mut page: Box<dyn Page>) {
-        page.on_new(&mut self.feed_state);
+        page.on_new(&mut self.feed_state, &self.database);
         self.pages.push(page);
     }
 
