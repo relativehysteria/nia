@@ -18,3 +18,15 @@ pub fn hash(s: &str) -> String {
 
     hash.to_string()
 }
+
+pub fn log(s: &str) {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/tmp/nia_log")
+    {
+        let _ = writeln!(file, "{}", s);
+    }
+}

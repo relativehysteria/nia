@@ -68,6 +68,11 @@ impl Page for PostPage {
         let feed = state.get_feed_mut(&self.feed_id).unwrap();
         feed.posts.mark_read(&self.post_id, true);
 
+        {
+            let post = feed.posts.get_by_id(&self.post_id).unwrap();
+            crate::log(&format!("{:?}", post));
+        }
+
         // Save the post in the database.
         let feed_url = feed.url.as_str().into();
         let post = feed.posts.get_by_id(&self.post_id).unwrap();

@@ -116,15 +116,13 @@ impl Database {
     /// Make a sled key for a post.
     fn make_key(feed_url: &str, post: &Post) -> Vec<u8> {
         let mut key = Vec::with_capacity(
-            feed_url.len() + 8 + post.id.0.len());
+            feed_url.len() + post.id.0.len() + 1);
 
         // Feed URL bytes.
         key.extend_from_slice(feed_url.as_bytes());
 
-        // Inverted timestamp (newest-first).
-        let ts = post.published.timestamp() as u64;
-        let inverted = u64::MAX - ts;
-        key.extend_from_slice(&inverted.to_be_bytes());
+        // Separator to avoid collisions
+        key.push(0);
 
         // Post ID.
         key.extend_from_slice(post.id.0.as_bytes());
@@ -134,7 +132,9 @@ impl Database {
 
     /// Get the prefix for scanning all posts of a feed.
     fn feed_prefix(feed_url: &str) -> Vec<u8> {
-        feed_url.as_bytes().to_vec()
+        let mut prefix = feed_url.as_bytes().to_vec();
+        prefix.push(0);
+        prefix
     }
 
     /// Save posts to the database.
@@ -156,10 +156,15 @@ impl Database {
         let tree = self.posts_tree();
         let prefix = Self::feed_prefix(feed_url);
 
-        tree.scan_prefix(prefix)
+        let posts = tree.scan_prefix(prefix)
             .filter_map(|res| res.ok())
             .filter_map(|(_, v)| postcard::from_bytes::<Post>(&v).ok())
-            .collect::<Vec<Post>>()
-            .into()
+            .collect::<Vec<Post>>();
+        if feed_url == "https://www.youtube.com/feeds/videos.xml?channel_id=UCd25I7Y3-NEKNOoImYhQ-3g" {
+            for post in posts.iter() {
+                crate::log(&format!("{:?}", post));
+            }
+        }
+        posts.into()
     }
 }
