@@ -201,17 +201,18 @@ impl App {
 
                 // Go through each post in the feed and mark it as read.
                 let feed = self.feed_state.get_feed_mut(&feed_id).unwrap();
-                for post in feed.posts.as_ref_mut().iter_mut() {
-                    // Skip read posts.
-                    if post.read {
-                        continue;
-                    }
 
-                    // Mark the post as read.
+                // Build a vector of unread posts.
+                let posts_to_mark: Vec<Post> = feed.posts.as_ref().iter()
+                    .filter(|post| !post.read)
+                    .cloned()
+                    .collect();
+
+                // Mark the unread posts as read.
+                for mut post in posts_to_mark.into_iter() {
+                    feed.posts.mark_read(&post.id, true);
                     post.read = true;
-
-                    // Insert it into our tracking vector.
-                    posts.insert(post.clone());
+                    posts.insert(post);
                 }
 
                 // Save the unread posts in our database.
@@ -222,17 +223,13 @@ impl App {
             },
 
             PageAction::TogglePostRead(feed_id, post_id) => {
-                // Create the vector for the post that will be saved in the
-                // database.
-                let mut posts = Posts::new();
-
                 // Get the post and toggle its read state.
                 let feed = self.feed_state.get_feed_mut(&feed_id).unwrap();
-                let post = feed.posts.get_by_id_mut(&post_id).unwrap();
-                post.read = !post.read;
+                feed.posts.toggle_read(&post_id);
 
                 // Save the post in our database.
-                posts.insert(post.clone());
+                let post = feed.posts.get_by_id(&post_id).unwrap();
+                let posts = Posts::from(post.clone());
                 let feed_url = feed.url.as_str().into();
                 self.database.request_tx.send(DatabaseRequest::SavePosts {
                     feed_url, posts

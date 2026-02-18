@@ -66,13 +66,12 @@ impl Page for PostPage {
     fn on_new(&mut self, state: &mut FeedState, database: &DatabaseChannel) {
         // Mark the post as read.
         let feed = state.get_feed_mut(&self.feed_id).unwrap();
-        let post = feed.posts.get_by_id_mut(&self.post_id).unwrap();
-        post.read = true;
+        feed.posts.mark_read(&self.post_id, true);
 
         // Save the post in the database.
         let feed_url = feed.url.as_str().into();
-        let mut posts = Posts::new();
-        posts.insert(post.clone());
+        let post = feed.posts.get_by_id(&self.post_id).unwrap();
+        let posts = Posts::from(post.clone());
 
         database.request_tx.send(DatabaseRequest::SavePosts {
             feed_url, posts

@@ -79,11 +79,21 @@ impl Page for MainPage {
                     ' '
                 };
 
+                // Build the feed line.
                 let feed = state.get_feed(&feed_id).unwrap();
-                ListItem::new(Line::from(vec![
+                let line = Line::from(vec![
                     Span::raw(format!("   {}  ", spinner)),
                     Span::raw(feed.title.as_ref()),
-                ]))
+                ]);
+
+                // If there are unread posts in this feed, make it more visible.
+                let line = if feed.posts.unread() != 0 {
+                    line.style(Style::default().add_modifier(Modifier::BOLD))
+                } else {
+                    line
+                };
+
+                ListItem::new(line)
             }
         });
 

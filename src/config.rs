@@ -38,71 +38,144 @@ pub struct Feed {
 }
 
 /// A vector of posts sorted by their published date.
-#[repr(transparent)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Posts(Vec<Post>);
+pub struct Posts {
+    /// The inner vector of posts.
+    inner: Vec<Post>,
+
+    /// Number of unread posts within inner.
+    unread: usize,
+}
 
 impl From<Vec<Post>> for Posts {
     fn from(mut v: Vec<Post>) -> Self {
         v.sort_unstable_by(|a, b| a.published.cmp(&b.published).reverse());
-        Self(v)
+        let unread = v.iter().filter(|p| !p.read).count();
+
+        Self {
+            inner: v,
+            unread,
+        }
+    }
+}
+
+impl From<Post> for Posts {
+    fn from(post: Post) -> Self {
+        Self {
+            unread: (!post.read) as usize,
+            inner: vec![post],
+        }
     }
 }
 
 impl Posts {
     /// Create a new post vector.
     pub fn new() -> Self {
-        Self(Vec::new())
+        Self {
+            inner: Vec::new(),
+            unread: 0,
+        }
     }
 
     /// Append posts from `other` to this vector.
     pub fn append(&mut self, other: Posts) {
-        other.0.into_iter().for_each(|post| self.insert(post));
+        other.inner.into_iter().for_each(|post| self.insert(post));
     }
 
     /// only retain elements specified by the predicate.
-    pub fn retain<F>(&mut self, f: F)
+    pub fn retain<F>(&mut self, mut f: F)
     where
         F: FnMut(&Post) -> bool
     {
-        self.0.retain(f)
+        self.inner.retain(|post| {
+            let keep = f(post);
+            if !keep && !post.read {
+                self.unread -= 1;
+            }
+            keep
+        });
     }
 
     /// Insert a new post into the vector.
     pub fn insert(&mut self, post: Post) {
-        let idx = self.0.binary_search_by(|p| p.cmp(&post).reverse())
+        let idx = self.inner
+            .binary_search_by(|p| p.cmp(&post).reverse())
             .unwrap_or_else(|p| p);
-        self.0.insert(idx, post);
+
+        if !post.read {
+            self.unread += 1;
+        }
+
+        self.inner.insert(idx, post);
     }
 
     /// Check if the vector contains `post` already.
     pub fn contains(&self, post: &Post) -> bool {
-        self.0.binary_search_by(|p| p.cmp(post).reverse()).is_ok()
+        self.inner.binary_search_by(|p| p.cmp(post).reverse()).is_ok()
     }
 
     /// Get the length of the posts vector.
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.inner.len()
+    }
+
+    /// Get the number of unread posts within this feed.
+    pub fn unread(&self) -> usize {
+        self.unread
+    }
+
+    /// Mark a post as read/unread.
+    pub fn mark_read(&mut self, post_id: &PostId, read: bool) {
+        // Get the post if it exists.
+        let Some(post) = self.get_by_id_mut(post_id) else {
+            return;
+        };
+
+        // If it already has the same read mark, there's nothing to change.
+        if post.read == read { return; }
+
+        // Mark the post
+        post.read = read;
+
+        // Change the tracking unread count.
+        if read {
+            self.unread -= 1;
+        } else {
+            self.unread += 1;
+        }
+    }
+
+    /// Toggle a post as read/unread.
+    pub fn toggle_read(&mut self, post_id: &PostId) {
+        // Get the post if it exists.
+        let Some(post) = self.get_by_id_mut(post_id) else {
+            return;
+        };
+
+        // Toggle the read status.
+        post.read = !post.read;
+
+        // Change the tracking unread count.
+        if post.read {
+            self.unread -= 1;
+        } else {
+            self.unread += 1;
+        }
     }
 
     /// Get a reference to post given its ID.
     pub fn get_by_id(&self, id: &PostId) -> Option<&Post> {
-        self.0.iter().find(|p| &p.id == id)
+        self.inner.iter().find(|p| &p.id == id)
     }
 
     /// Get a mutable reference to a post given its ID.
-    pub fn get_by_id_mut(&mut self, id: &PostId) -> Option<&mut Post> {
-        self.0.iter_mut().find(|p| &p.id == id)
+    fn get_by_id_mut(&mut self, id: &PostId) -> Option<&mut Post> {
+        self.inner.iter_mut().find(|p| &p.id == id)
     }
 
     /// Get a reference to the inner vector.
     pub fn as_ref(&self) -> &[Post] {
-        &self.0
-    }
-
-    /// Get a mutable reference to the inner vector.
-    pub fn as_ref_mut(&mut self) -> &mut [Post] {
-        &mut self.0
+        &self.inner
     }
 }
 
