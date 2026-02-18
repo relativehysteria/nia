@@ -106,12 +106,110 @@ impl App {
 
         Self { download, database, pages, feed_state, }
     }
+    /// Run the application.
+    pub fn run<B: Backend>(mut self, terminal: &mut Terminal<B>) {
+        // Set the tick rate for animations.
+        let fps = 60;
+        let tick_rate = Duration::from_millis(1000 / fps);
+        let mut last_tick = Instant::now();
+
+        loop {
+            // Draw the page.
+            terminal.draw(|f| self.draw(f)).unwrap();
+
+            // If there's an active download, we have to do ticks because of
+            // animations and polls and stuff.
+            if !self.feed_state.downloading.is_empty() {
+                // Handle events from the background downloader.
+                self.handle_download_events();
+
+                // Our input handler _blocks_, so we will poll for events on a
+                // timeout and only call the handler when we get an event.
+                let timeout = tick_rate
+                    .checked_sub(last_tick.elapsed())
+                    .unwrap_or(Duration::ZERO);
+
+                if event::poll(timeout).unwrap() {
+                    if self.handle_input() {
+                        break;
+                    }
+                }
+
+                // Animate the global spinner.
+                if last_tick.elapsed() >= tick_rate {
+                    let now = Instant::now();
+                    self.feed_state.spinner.tick(now);
+                    last_tick = now;
+                }
+            } else {
+                // No active download. We can block on input
+                if self.handle_input() {
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Handle the input for the app in a blocking manner.
+    fn handle_input(&mut self) -> bool {
+        // Get the key.
+        let Event::Key(key) = event::read().unwrap() else {
+            return false;
+        };
+
+        // Global escape: pop page if possible. If we're on the first page, we
+        // allow this event to reach it, otherwise we use it to pop the current
+        // page.
+        if self.pages.len() > 1 {
+            if matches!(key.code, KeyCode::Esc | KeyCode::Char('h')) {
+                self.go_back();
+                return false;
+            }
+        }
+
+        // Shared list navigation hook for all pages. If we handle the input
+        // here, it won't be passed to the page specific handler.
+        let page = self.pages.last_mut().unwrap();
+        let mut input_handled = true;
+        match key.code {
+            KeyCode::Up | KeyCode::Char('k') => page.list().up(1),
+            KeyCode::Down | KeyCode::Char('j') => page.list().down(1),
+            KeyCode::PageUp | KeyCode::Char('K') => page.list().up(10),
+            KeyCode::PageDown | KeyCode::Char('J') => page.list().down(10),
+            KeyCode::Char('g') => page.list().up(usize::MAX),
+            KeyCode::Char('G') => page.list().down(usize::MAX),
+            KeyCode::Char('q') => return true,
+            _ => input_handled = false,
+        }
+
+        // If we have handled the input above, there's nothing else to do.
+        if input_handled {
+            return false;
+        }
+
+        // We haven't handled the input above. The page might wanna handle it
+        // instead.
+        match page.on_key(key.code, &mut self.feed_state) {
+            PageAction::None                  => {},
+            PageAction::NewPage(p)            => self.new_page(p),
+            PageAction::DownloadFeed(feed_id) => self.start_download(feed_id),
+            PageAction::DownloadAllFeeds      => self.download_all(),
+        }
+
+        false
+    }
 
     /// Go back from the currently shown page to the one before.
     fn go_back(&mut self) {
         if self.pages.len() > 1 {
             self.pages.pop();
         }
+    }
+
+    /// Go from the current page to a new page.
+    fn new_page(&mut self, mut page: Box<dyn Page>) {
+        page.on_new(&mut self.feed_state);
+        self.pages.push(page);
     }
 
     /// Draw the page.
@@ -206,96 +304,4 @@ impl App {
         }
     }
 
-    /// Run the application.
-    pub fn run<B: Backend>(mut self, terminal: &mut Terminal<B>) {
-        // Set the tick rate for animations.
-        let fps = 60;
-        let tick_rate = Duration::from_millis(1000 / fps);
-        let mut last_tick = Instant::now();
-
-        loop {
-            // Draw the page.
-            terminal.draw(|f| self.draw(f)).unwrap();
-
-            // If there's an active download, we have to do ticks because of
-            // animations and polls and stuff.
-            if !self.feed_state.downloading.is_empty() {
-                // Handle events from the background downloader.
-                self.handle_download_events();
-
-                // Our input handler _blocks_, so we will poll for events on a
-                // timeout and only call the handler when we get an event.
-                let timeout = tick_rate
-                    .checked_sub(last_tick.elapsed())
-                    .unwrap_or(Duration::ZERO);
-
-                if event::poll(timeout).unwrap() {
-                    if self.handle_input() {
-                        break;
-                    }
-                }
-
-                // Animate the global spinner.
-                if last_tick.elapsed() >= tick_rate {
-                    let now = Instant::now();
-                    self.feed_state.spinner.tick(now);
-                    last_tick = now;
-                }
-            } else {
-                // No active download. We can block on input
-                if self.handle_input() {
-                    break;
-                }
-            }
-        }
-    }
-
-    /// Handle the input for the app in a blocking manner.
-    fn handle_input(&mut self) -> bool {
-        // Get the key.
-        let Event::Key(key) = event::read().unwrap() else {
-            return false;
-        };
-
-        // Global escape: pop page if possible. If we're on the first page, we
-        // allow this event to reach it, otherwise we use it to pop the current
-        // page.
-        if self.pages.len() > 1 {
-            if matches!(key.code, KeyCode::Esc | KeyCode::Char('h')) {
-                self.go_back();
-                return false;
-            }
-        }
-
-        // Shared list navigation hook for all pages. If we handle the input
-        // here, it won't be passed to the page specific handler.
-        let page = self.pages.last_mut().unwrap();
-        let mut input_handled = true;
-        match key.code {
-            KeyCode::Up | KeyCode::Char('k') => page.list().up(1),
-            KeyCode::Down | KeyCode::Char('j') => page.list().down(1),
-            KeyCode::PageUp | KeyCode::Char('K') => page.list().up(10),
-            KeyCode::PageDown | KeyCode::Char('J') => page.list().down(10),
-            KeyCode::Char('g') => page.list().up(usize::MAX),
-            KeyCode::Char('G') => page.list().down(usize::MAX),
-            KeyCode::Char('q') => return true,
-            _ => input_handled = false,
-        }
-
-        // If we have handled the input above, there's nothing else to do.
-        if input_handled {
-            return false;
-        }
-
-        // We haven't handled the input above. The page might wanna handle it
-        // instead.
-        match page.on_key(key.code, &mut self.feed_state) {
-            PageAction::None                  => {},
-            PageAction::NewPage(p)            => self.pages.push(p),
-            PageAction::DownloadFeed(feed_id) => self.start_download(feed_id),
-            PageAction::DownloadAllFeeds      => self.download_all(),
-        }
-
-        false
-    }
 }

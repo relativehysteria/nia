@@ -90,6 +90,11 @@ impl Posts {
         self.0.iter().find(|p| &p.id == id)
     }
 
+    /// Get a mutable reference to a post given its ID.
+    pub fn get_by_id_mut(&mut self, id: &PostId) -> Option<&mut Post> {
+        self.0.iter_mut().find(|p| &p.id == id)
+    }
+
     /// Get a reference to the inner vector.
     pub fn as_ref(&self) -> &[Post] {
         &self.0

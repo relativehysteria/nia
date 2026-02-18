@@ -61,4 +61,11 @@ impl Page for PostPage {
     fn list(&mut self) -> &mut dyn NavigableList {
         &mut self.list
     }
+
+    fn on_new(&mut self, state: &mut FeedState) {
+        // Mark the post as read.
+        let feed = state.get_feed_mut(&self.feed_id).unwrap();
+        let post = feed.posts.get_by_id_mut(&self.post_id).unwrap();
+        post.read = true;
+    }
 }

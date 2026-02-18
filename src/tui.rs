@@ -31,6 +31,11 @@ pub trait Page {
 
     /// Access to the list for shared navigation.
     fn list(&mut self) -> &mut dyn NavigableList;
+
+    /// A hook that is executed by the app when the page is created and pushed
+    /// to the page stack.
+    #[allow(unused_variables)]
+    fn on_new(&mut self, state: &mut FeedState) {}
 }
 
 /// Navigation controls for selectable lists.
