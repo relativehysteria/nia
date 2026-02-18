@@ -145,7 +145,12 @@ impl Database {
             let key = Self::make_key(feed_url, &post);
             let value = postcard::to_stdvec(&post)
                 .expect("Failed to serialize post");
-            tree.insert(key, value).expect("Failed to insert post");
+
+            tree.compare_and_swap(
+                key,
+                None as Option<&[u8]>,
+                Some(value),
+            ).expect("CAS failed");
         }
 
         tree.flush().expect("Failed to flush posts tree");
