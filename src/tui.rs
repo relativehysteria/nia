@@ -2,6 +2,7 @@ pub mod main;
 pub mod feed;
 pub mod post;
 
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use ratatui::{
     prelude::*,
@@ -74,6 +75,9 @@ pub enum PageAction {
 
     /// Toggle the read status for the post.
     TogglePostRead(FeedId, PostId),
+
+    /// Copy something into clipboard.
+    CopyToClipboard(Arc<str>),
 }
 
 /// A page that lists out selectable `T` elements.

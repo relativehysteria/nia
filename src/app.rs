@@ -2,6 +2,7 @@ use std::time::{Instant, Duration};
 use std::collections::HashMap;
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::prelude::*;
+use arboard::Clipboard;
 use crate::tui::{main, Page, PageAction, Spinner};
 use crate::config::{Section, Feed, FeedId, FeedConfig, Post, Posts};
 use crate::download::*;
@@ -94,6 +95,9 @@ pub struct App {
 
     /// State of the background feed storage.
     database: DatabaseChannel,
+
+    /// State of the system clipboard.
+    clipboard: Clipboard,
 }
 
 impl App {
@@ -103,9 +107,11 @@ impl App {
         let database = DatabaseChannel::spawn_database_thread(&mut feeds);
         let pages = vec![Box::new(main::MainPage::new(&feeds)) as Box<dyn Page>];
         let feed_state = FeedState::new(feeds);
+        let clipboard = Clipboard::new().expect("Couldn't open clipboard");
 
-        Self { download, database, pages, feed_state, }
+        Self { download, database, pages, feed_state, clipboard }
     }
+
     /// Run the application.
     pub fn run<B: Backend>(mut self, terminal: &mut Terminal<B>) {
         // Set the tick rate for animations.
@@ -194,6 +200,7 @@ impl App {
             PageAction::NewPage(p)            => self.new_page(p),
             PageAction::DownloadFeed(feed_id) => self.start_download(feed_id),
             PageAction::DownloadAllFeeds      => self.download_all(),
+            PageAction::CopyToClipboard(url)  => self.to_clipboard(&url),
 
             PageAction::MarkFeedRead(feed_id) => {
                 // Crate the vector that will be saved in the database.
@@ -238,6 +245,11 @@ impl App {
         }
 
         false
+    }
+
+    /// Copy the string `s` into the system clipboard.
+    fn to_clipboard(&mut self, s: &str) {
+        self.clipboard.set_text(s).expect("Couldn't copy to clipboard");
     }
 
     /// Go back from the currently shown page to the one before.

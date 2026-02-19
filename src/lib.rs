@@ -19,6 +19,7 @@ pub fn hash(s: &str) -> String {
     hash.to_string()
 }
 
+/// Log the string `s` to a file.
 pub fn log(s: &str) {
     use std::fs::OpenOptions;
     use std::io::Write;

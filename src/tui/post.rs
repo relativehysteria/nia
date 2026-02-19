@@ -1,8 +1,9 @@
+use crossterm::event::KeyCode;
 use ratatui::{
     prelude::*,
     widgets::ListItem,
 };
-use crate::tui::{Page, NavigableList, ListPage};
+use crate::tui::{Page, NavigableList, ListPage, PageAction};
 use crate::app::FeedState;
 use crate::config::{FeedId, PostId, Posts};
 use crate::database::{DatabaseChannel, DatabaseRequest};
@@ -61,6 +62,19 @@ impl Page for PostPage {
 
     fn list(&mut self) -> &mut dyn NavigableList {
         &mut self.list
+    }
+
+    fn on_key(&mut self, key: KeyCode, _state: &FeedState) -> PageAction {
+        let Some(selected) = self.list.selected_item() else {
+            return PageAction::None;
+        };
+
+        match key {
+            KeyCode::Char('l') => {
+                PageAction::CopyToClipboard(selected.as_str().into())
+            }
+            _ => PageAction::None,
+        }
     }
 
     fn on_new(&mut self, state: &mut FeedState, database: &DatabaseChannel) {
