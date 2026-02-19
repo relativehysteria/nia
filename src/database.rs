@@ -146,11 +146,7 @@ impl Database {
             let value = postcard::to_stdvec(&post)
                 .expect("Failed to serialize post");
 
-            let _ = tree.compare_and_swap(
-                key,
-                None as Option<&[u8]>,
-                Some(value),
-            ).expect("CAS failed");
+            tree.insert(key, value).expect("Failed to insert post");
         }
 
         tree.flush().expect("Failed to flush posts tree");
