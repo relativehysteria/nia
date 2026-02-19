@@ -1,5 +1,6 @@
 //! Config parsing and stuff.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::io::{self, BufRead};
 use std::path::PathBuf;
@@ -37,11 +38,14 @@ pub struct Feed {
     pub posts: Posts,
 }
 
-/// A vector of posts sorted by their published date.
+/// A vector of posts.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Posts {
-    /// The inner vector of posts.
+    /// The inner vector of posts, sorted by their published date.
     inner: Vec<Post>,
+
+    /// A tracking set of IDs, used to deduplicate the posts on insertion.
+    ids: HashSet<PostId>,
 
     /// Number of unread posts within inner.
     unread: usize,
@@ -49,11 +53,29 @@ pub struct Posts {
 
 impl From<Vec<Post>> for Posts {
     fn from(mut v: Vec<Post>) -> Self {
-        v.sort_unstable_by(|a, b| a.published.cmp(&b.published).reverse());
-        let unread = v.iter().filter(|p| !p.read).count();
+        // Sort newest first
+        v.sort_unstable_by(|a, b| b.published.cmp(&a.published));
+
+        let mut ids = HashSet::with_capacity(v.len());
+        let mut deduped = Vec::with_capacity(v.len());
+        let mut unread = 0;
+
+        // Iterate from oldest to newest by going backwards
+        for post in v.into_iter().rev() {
+            if ids.insert(post.id.clone()) {
+                if !post.read {
+                    unread += 1;
+                }
+                deduped.push(post);
+            }
+        }
+
+        // Reverse again so final order is newest first
+        deduped.reverse();
 
         Self {
-            inner: v,
+            inner: deduped,
+            ids,
             unread,
         }
     }
@@ -63,6 +85,7 @@ impl From<Post> for Posts {
     fn from(post: Post) -> Self {
         Self {
             unread: (!post.read) as usize,
+            ids: HashSet::from([post.id.clone()]),
             inner: vec![post],
         }
     }
@@ -74,6 +97,7 @@ impl Posts {
         Self {
             inner: Vec::new(),
             unread: 0,
+            ids: HashSet::new(),
         }
     }
 
@@ -89,18 +113,35 @@ impl Posts {
     {
         self.inner.retain(|post| {
             let keep = f(post);
-            if !keep && !post.read {
-                self.unread -= 1;
+
+            if !keep {
+                self.ids.remove(&post.id);
+
+                if !post.read {
+                    self.unread -= 1;
+                }
             }
+
             keep
         });
     }
 
     /// Insert a new post into the vector.
+    ///
+    /// If a post with the same ID already exists, the new post won't be
+    /// inserted.
     pub fn insert(&mut self, post: Post) {
-        let idx = self.inner
-            .binary_search_by(|p| p.cmp(&post).reverse())
-            .unwrap_or_else(|p| p);
+        // Don't duplicate posts.
+        if !self.ids.insert(post.id.clone()) {
+            return;
+        }
+
+        // Find insertion index.
+        let idx = self
+            .inner
+            .binary_search_by(|p| p.published.cmp(&post.published).reverse())
+            .unwrap_or_else(|i| i);
+
 
         if !post.read {
             self.unread += 1;
@@ -111,7 +152,7 @@ impl Posts {
 
     /// Check if the vector contains `post` already.
     pub fn contains(&self, post: &Post) -> bool {
-        self.inner.binary_search_by(|p| p.cmp(post).reverse()).is_ok()
+        self.ids.contains(&post.id)
     }
 
     /// Get the length of the posts vector.
