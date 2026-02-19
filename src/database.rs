@@ -165,11 +165,7 @@ impl Database {
             .filter_map(|res| res.ok())
             .filter_map(|(_, v)| postcard::from_bytes::<Post>(&v).ok())
             .collect::<Vec<Post>>();
-        if feed_url == "https://www.youtube.com/feeds/videos.xml?channel_id=UCd25I7Y3-NEKNOoImYhQ-3g" {
-            for post in posts.iter() {
-                crate::log(&format!("{:?}", post));
-            }
-        }
+
         posts.into()
     }
 }
