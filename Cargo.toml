@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-arboard = { version = "3.6", default-features = false }
 atom_syndication = { version = "0.12", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["now"] }
 crossterm = { version = "0.29", default-features = false, features = ["events"] }
