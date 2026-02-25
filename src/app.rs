@@ -154,6 +154,8 @@ impl App {
     }
 
     /// Handle the input for the app in a blocking manner.
+    ///
+    /// Returns whether we should exit the application.
     fn handle_input(&mut self) -> bool {
         // Get the key.
         let Event::Key(key) = event::read().unwrap() else {
