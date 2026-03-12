@@ -194,7 +194,7 @@ where
         )
         .highlight_style(
             Style::default()
-                .fg(Color::Blue)
+                .reversed()
         )
         .highlight_symbol(" ")
         .scroll_padding(4)
