@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::time::{Instant, Duration};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::prelude::*;
 use crate::tui::{main, Page, PageAction, Spinner};
@@ -28,6 +28,12 @@ pub struct FeedState {
 
     /// A map of feeds that are currently queued to be downloaded.
     downloading: HashMap<FeedId, DownloadState>,
+
+    /// A list of downloaded feeds.
+    ///
+    /// Once a feed is downloaded, it is impossible to download again for the
+    /// session.
+    downloaded: HashSet<FeedId>,
 }
 
 impl FeedState {
@@ -37,6 +43,7 @@ impl FeedState {
             feed_config,
             downloading: HashMap::new(),
             spinner: Spinner::new(),
+            downloaded: HashSet::new(),
         }
     }
 
@@ -103,7 +110,8 @@ impl App {
     pub fn new(mut feeds: FeedConfig) -> Self {
         let download = DownloadChannel::spawn_downloader_thread();
         let database = DatabaseChannel::spawn_database_thread(&mut feeds);
-        let pages = vec![Box::new(main::MainPage::new(&feeds)) as Box<dyn Page>];
+        let pages = vec![
+            Box::new(main::MainPage::new(&feeds)) as Box<dyn Page>];
         let feed_state = FeedState::new(feeds);
 
         Self { download, database, pages, feed_state }
@@ -291,6 +299,9 @@ impl App {
 
     /// Start downloading a single feed.
     fn start_download(&mut self, feed: FeedId) {
+        // If this feed was downloaded already, don't download it again.
+        if self.feed_state.downloaded.contains(&feed) { return; }
+
         // Mark the feed as queued up for download.
         self.feed_state.downloading.insert(feed.clone(), DownloadState::Queued);
 
@@ -313,6 +324,10 @@ impl App {
         for (section_idx, section) in url_map.0.iter().enumerate() {
             for (feed_idx, _) in section.iter().enumerate() {
                 let feed = FeedId { section_idx, feed_idx };
+
+                // If this feed has been already downloaded, don't download it
+                // again.
+                if self.feed_state.downloaded.contains(&feed) { return; }
 
                 // If we're already downloading something, do not change the
                 // queue state.
@@ -371,6 +386,9 @@ impl App {
 
                     // Remove the feed's downloading status.
                     self.feed_state.downloading.remove(&feed);
+
+                    // Mark the feed as downloaded.
+                    self.feed_state.downloaded.insert(feed);
                 },
             }
         }
