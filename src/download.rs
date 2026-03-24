@@ -8,10 +8,9 @@ use crate::hash;
 
 /// A map of sections to feeds to URLs.
 #[derive(Debug)]
-pub struct UrlMap(pub Vec<Vec<Url>>);
+pub struct UrlMap(pub Vec<Vec<Option<Url>>>);
 
 impl From<&FeedConfig> for UrlMap {
-    /// Given a feed config, create a `FeedId -> URL` map.
     fn from(feed_config: &FeedConfig) -> Self {
         let map = feed_config
             .sections
@@ -20,10 +19,10 @@ impl From<&FeedConfig> for UrlMap {
                 section
                     .feeds
                     .iter()
-                    .map(|feed| feed.url.clone())
-                    .collect::<Vec<Url>>()
+                    .map(|feed| Some(feed.url.clone()))
+                    .collect::<Vec<Option<Url>>>()
             })
-            .collect::<Vec<Vec<Url>>>();
+            .collect::<Vec<Vec<Option<Url>>>>();
 
         Self(map)
     }
@@ -81,7 +80,7 @@ impl DownloadChannel {
                 match request {
                     // Immediately start a downloader when downloading one feed.
                     DownloadRequest::Feed { feed, url } => {
-                        let feed = vec![(feed, url)];
+                        let feed = vec![(feed, Some(url))];
                         spawn_feed_downloader(feed, response_tx.clone());
                     },
 
@@ -95,7 +94,7 @@ impl DownloadChannel {
                                 .enumerate()
                                 .map(|(feed_idx, url)| {
                                     (FeedId { section_idx, feed_idx, }, url)
-                                }).collect::<Vec<(FeedId, Url)>>();
+                                }).collect::<Vec<(FeedId, Option<Url>)>>();
 
                             spawn_feed_downloader(feeds, response_tx.clone());
                         }
@@ -111,11 +110,13 @@ impl DownloadChannel {
 
 /// Spawn a thread that downloads `feeds` sequentially.
 fn spawn_feed_downloader(
-    feeds: Vec<(FeedId, Url)>,
+    feeds: Vec<(FeedId, Option<Url>)>,
     response_tx: mpsc::Sender<DownloadResponse>,
 ) {
     std::thread::spawn(move || {
         for (feed, url) in feeds.into_iter() {
+            let Some(url) = url else { continue };
+
             // Tell the app we have started the download.
             let _ = response_tx.send(DownloadResponse::Started(feed.clone()));
 

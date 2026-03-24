@@ -318,16 +318,19 @@ impl App {
     /// One downloader is spawned for each section.
     fn download_all(&mut self) {
         // Build the URL map for the request.
-        let url_map = UrlMap::from(&self.feed_state.feed_config);
+        let mut url_map = UrlMap::from(&self.feed_state.feed_config);
 
         // Queue up all feeds.
-        for (section_idx, section) in url_map.0.iter().enumerate() {
-            for (feed_idx, _) in section.iter().enumerate() {
+        for (section_idx, section) in url_map.0.iter_mut().enumerate() {
+            for (feed_idx, url_opt) in section.iter_mut().enumerate() {
                 let feed = FeedId { section_idx, feed_idx };
 
                 // If this feed has been already downloaded, don't download it
                 // again.
-                if self.feed_state.downloaded.contains(&feed) { return; }
+                if self.feed_state.downloaded.contains(&feed) {
+                    *url_opt = None;
+                    continue;
+                }
 
                 // If we're already downloading something, do not change the
                 // queue state.
