@@ -121,7 +121,14 @@ fn spawn_feed_downloader(
             let _ = response_tx.send(DownloadResponse::Started(feed.clone()));
 
             // Do the actual download.
-            let result = reqwest::blocking::get(String::from(url))
+            let client = reqwest::blocking::ClientBuilder::new()
+                .user_agent("Mozilla/5.0 Gecko/20100101")
+                .redirect(reqwest::redirect::Policy::limited(10))
+                .build()
+                .unwrap();
+
+            let result = client.get(String::from(url))
+                .send()
                 .and_then(|r| r.error_for_status())
                 .and_then(|r| r.text());
 
