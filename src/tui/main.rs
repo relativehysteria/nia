@@ -88,7 +88,9 @@ impl Page for MainPage {
 
                 // If there are unread posts in this feed, make it more visible.
                 let line = if feed.posts.unread() != 0 {
-                    line.style(Style::default().add_modifier(Modifier::BOLD))
+                    line.style(Style::default()
+                        .add_modifier(Modifier::BOLD)
+                        .fg(Color::Red))
                 } else {
                     line
                 };
