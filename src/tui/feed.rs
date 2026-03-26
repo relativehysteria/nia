@@ -49,7 +49,7 @@ impl Page for FeedPage {
             ]);
 
             let line = if !post.read {
-                line.style(Style::default().add_modifier(Modifier::BOLD))
+                line.style(crate::tui::UNREAD_STYLE)
             } else {
                 line
             };

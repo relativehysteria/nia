@@ -13,6 +13,11 @@ use crate::app::FeedState;
 use crate::config::{FeedId, PostId};
 use crate::database::DatabaseChannel;
 
+/// The style of unread feed and post entries.
+pub const UNREAD_STYLE: Style = Style::new()
+    .add_modifier(Modifier::BOLD)
+    .fg(Color::Red);
+
 /// Trait which must be implemented for all entries in a navigable list that are
 /// selectable.
 pub trait Selectable {
