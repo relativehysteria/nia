@@ -1,8 +1,7 @@
 # nia
 
-`nia` is an ultra minimalist atom/rss feed reader that only shows the URLs in a
-feed post. In other words, the only post data it saves (and shows) are URLs
-present in the post (which usually includes the post URL itself!).
+`nia` is an ultra-minimal Atom/RSS feed reader that extracts and displays only
+the URLs found in each post.
 
 The reason for this is simple; I found out that many feeds do not send full post
 contents, instead choosing to cut the content and redirect you to the actual
