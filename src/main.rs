@@ -5,6 +5,23 @@ use crossterm::terminal::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 
+/// Initialize the application wide panic handler.
+///
+/// Specifically, we have to exit the raw mode when panicking to print out the
+/// information in a sane manner.
+fn init_panic_handler() {
+    let original = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        crossterm::execute!(
+            std::io::stderr(),
+            crossterm::terminal::LeaveAlternateScreen
+        ).unwrap();
+        crossterm::terminal::disable_raw_mode().unwrap();
+
+        original(panic_info);
+    }));
+}
+
 fn main() -> io::Result<()> {
     // Parse the feeds
     let feeds = nia::config::FeedConfig::parse_feed_file()
@@ -20,6 +37,9 @@ fn main() -> io::Result<()> {
     crossterm::execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+
+    // Overwrite the panic handler with our own.
+    init_panic_handler();
 
     // Run the app!
     nia::app::App::new(feeds).run(&mut terminal);
